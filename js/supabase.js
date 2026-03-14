@@ -1,0 +1,140 @@
+// ============================================
+// PRODUCTIVITY HUB - SUPABASE DATABASE
+// ============================================
+
+// Initialize Supabase Client
+async function initializeSupabase() {
+    try {
+        console.log('🔌 Connecting to Supabase...');
+        
+        const { createClient } = supabase;
+        supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Test connection
+        const { data, error } = await supabaseClient
+            .from('categories')
+            .select('count')
+            .limit(1);
+        
+        if (error) throw error;
+        
+        console.log('✅ Supabase connected successfully');
+        updateConnectionStatus(true);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Supabase connection failed:', error);
+        updateConnectionStatus(false, error.message);
+        return false;
+    }
+}
+
+// Fetch all initial data
+async function fetchInitialData() {
+    try {
+        console.log('📥 Fetching initial data...');
+        
+        // Fetch categories (exclude soft-deleted)
+        const { data: categories, error: catError } = await supabaseClient
+            .from('categories')
+            .select('*')
+            .is('deleted_at', null)
+            .order('display_order', { nullsFirst: false });
+        
+        if (catError) throw catError;
+        appState.categories = categories;
+        console.log(`✅ Loaded ${categories.length} categories`);
+        
+        // Fetch habits
+        const { data: habits, error: habitError } = await supabaseClient
+            .from('habits')
+            .select('*')
+            .eq('archived', false)
+            .order('user_order');
+        
+        if (habitError) throw habitError;
+        appState.habits = habits;
+        console.log(`✅ Loaded ${habits.length} habits`);
+        
+        // Fetch habit streaks
+        const { data: streaks, error: streakError } = await supabaseClient
+            .from('habit_streaks')
+            .select('*');
+        
+        if (streakError) throw streakError;
+        appState.habitStreaks = streaks;
+        console.log(`✅ Loaded ${streaks.length} habit streaks`);
+        
+        // Fetch tasks
+        const { data: tasks, error: taskError } = await supabaseClient
+            .from('tasks')
+            .select(`
+                *,
+                category:categories(id, name, color_hex),
+                goal:goals(id, name)
+            `)
+            .eq('status', 'active')
+            .order('user_order', { ascending: true, nullsFirst: false })
+            .order('due_date', { ascending: true, nullsFirst: false });
+
+        if (taskError) throw taskError;
+        appState.tasks = tasks;
+        console.log(`✅ Loaded ${tasks.length} tasks`);
+        
+        // Fetch goals: active + recently-archived (for analytics), exclude deleted
+        const { data: goals, error: goalError } = await supabaseClient
+            .from('goals')
+            .select('*')
+            .neq('status', 'deleted')
+            .is('deleted_at', null)
+            .order('due_date', { nullsFirst: false });
+        
+        if (goalError) throw goalError;
+        appState.goals = goals;
+        console.log(`✅ Loaded ${goals.length} goals`);
+        
+        // Fetch habit completions for the last 365 days (needed for analytics)
+        const oneYearAgo = getMelbourneDate();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const oneYearAgoStr = oneYearAgo.getFullYear() + '-' +
+            String(oneYearAgo.getMonth() + 1).padStart(2, '0') + '-' +
+            String(oneYearAgo.getDate()).padStart(2, '0');
+        const { data: completions, error: compError } = await supabaseClient
+            .from('habit_completions')
+            .select('*')
+            .gte('completion_date', oneYearAgoStr);
+
+        if (compError) throw compError;
+        appState.habitCompletions = completions;
+        console.log(`✅ Loaded ${completions.length} habit completions (last 365 days)`);
+        
+        // Populate filter dropdowns
+        populateFilterDropdowns();
+
+        appState.isLoading = false;
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error fetching initial data:', error);
+        appState.error = error.message;
+        showToast('Failed to load data', 'error');
+        return false;
+    }
+}
+
+// ============================================
+// SOFT-DELETE PURGE (30-day retention)
+// ============================================
+async function purgeSoftDeleted() {
+    try {
+        const { error } = await supabaseClient.rpc('purge_old_deleted_records');
+        if (error) {
+            // Non-critical — log and continue
+            console.warn('⚠️ Purge skipped:', error.message);
+        } else {
+            console.log('🗑️ Purged records older than 30 days');
+        }
+    } catch (err) {
+        console.warn('⚠️ Purge error (non-critical):', err);
+    }
+}

@@ -1,0 +1,674 @@
+/* ============================================
+   PRODUCTIVITY HUB - STYLES
+   ============================================ */
+
+/* ---- CSS Custom Properties (Things 3 palette) ---- */
+:root {
+    --bg-primary:       #FFFFFF;
+    --bg-secondary:     #F5F5F7;
+    --bg-tertiary:      #EBEBED;
+    --text-primary:     #1D1D1F;
+    --text-secondary:   #6E6E73;
+    --accent:           #007AFF;
+    --accent-hover:     #0066DD;
+    --border:           #E5E5EA;
+    --success:          #34C759;
+    --warning:          #FF9500;
+    --danger:           #FF3B30;
+    --shadow-sm:        0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md:        0 4px 12px rgba(0,0,0,0.08);
+    --radius-card:      12px;
+    --radius-sm:        8px;
+    --font-system:      -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+body.dark {
+    --bg-primary:       #000000;
+    --bg-secondary:     #1C1C1E;
+    --bg-tertiary:      #2C2C2E;
+    --text-primary:     #FFFFFF;
+    --text-secondary:   #98989D;
+    --accent:           #0A84FF;
+    --accent-hover:     #409CFF;
+    --border:           #3A3A3C;
+    --success:          #30D158;
+    --warning:          #FF9F0A;
+    --danger:           #FF453A;
+    --shadow-sm:        0 1px 3px rgba(0,0,0,0.35);
+    --shadow-md:        0 4px 12px rgba(0,0,0,0.45);
+}
+
+/* ---- Base ---- */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--font-system);
+    font-size: 15px;
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Panel transitions ---- */
+.panel {
+    transition: opacity 0.2s ease-in-out;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.panel.hidden {
+    display: none;
+}
+
+/* ---- Bottom navigation ---- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255,255,255,0.88);
+    border-top: 1px solid var(--border);
+    z-index: 9999;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+body.dark .bottom-nav {
+    background: rgba(0,0,0,0.88);
+}
+
+.nav-btn {
+    transition: color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 12px;
+    border-radius: 0;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.nav-btn:hover {
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.nav-btn.active {
+    color: var(--accent);
+    background: transparent;
+}
+
+.nav-btn i {
+    font-size: 22px;
+}
+
+/* Ensure content doesn't get hidden behind bottom nav */
+.main-content {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0));
+}
+
+/* Bottom nav wrapper */
+.bottom-nav-wrapper {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 6px 0;
+    max-width: 100vw;
+}
+
+/* ---- Panel typography ---- */
+.panel-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+
+/* ---- Loading spinner ---- */
+.spinner {
+    border: 3px solid var(--bg-tertiary);
+    border-top: 3px solid var(--accent);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ---- Custom scrollbar ---- */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* ---- Touch-friendly buttons ---- */
+.touch-target {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* ---- Toast notifications ---- */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 14px 18px;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-md);
+    z-index: 10000;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+.toast.success {
+    background: var(--success);
+    color: white;
+}
+
+.toast.error {
+    background: var(--danger);
+    color: white;
+}
+
+/* ---- Modal styles ---- */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    padding: 20px;
+}
+
+.modal-content {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 18px;
+    max-width: 500px;
+    width: 100%;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    margin-bottom: 80px;
+    box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        max-height: calc(100vh - 100px);
+        margin-bottom: 70px;
+    }
+}
+
+/* ---- Habit card styles (Things 3) ---- */
+.habit-card {
+    background: var(--bg-primary);
+    border: none;
+    border-radius: var(--radius-card);
+    padding: 13px 16px;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    cursor: move;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 2px;
+}
+
+.habit-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.habit-card.dragging {
+    opacity: 0.5;
+    transform: scale(1.02);
+}
+
+.habit-card.drag-over {
+    border-top: 2px solid var(--accent);
+}
+
+.habit-checkbox {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.habit-checkbox:hover {
+    border-color: var(--success);
+    background: rgba(52,199,89,0.08);
+}
+
+.habit-checkbox.checked {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.habit-checkbox.checked::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translateY(-1px);
+}
+
+/* ---- Task card styles (Things 3) ---- */
+.task-card {
+    background: var(--bg-primary);
+    border: none;
+    border-radius: var(--radius-card);
+    padding: 13px 16px;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 2px;
+}
+
+.task-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.task-card.completed {
+    opacity: 0.5;
+}
+
+.task-checkbox {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.task-checkbox:hover {
+    border-color: var(--accent);
+    background: rgba(0,122,255,0.08);
+}
+
+.task-checkbox.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.task-checkbox.checked::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translateY(-1px);
+}
+
+.category-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.overdue-badge {
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.overdue-high {
+    background: rgba(255,59,48,0.12);
+    color: var(--danger);
+}
+
+.overdue-medium {
+    background: rgba(255,149,0,0.12);
+    color: var(--warning);
+}
+
+.overdue-low {
+    background: rgba(0,122,255,0.1);
+    color: var(--accent);
+}
+
+.streak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.streak-badge.hot {
+    background: rgba(255,149,0,0.12);
+    color: var(--warning);
+}
+
+.streak-badge.warm {
+    background: rgba(0,122,255,0.1);
+    color: var(--accent);
+}
+
+.streak-badge.cold {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+/* ---- Filter button styles ---- */
+.filter-btn {
+    padding: 7px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    white-space: nowrap;
+}
+
+.filter-btn.active {
+    background: var(--accent);
+    color: white;
+}
+
+.filter-btn:not(.active) {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.filter-btn:not(.active):hover {
+    background: var(--bg-tertiary);
+}
+
+/* ---- Emoji picker styles ---- */
+.emoji-category {
+    margin-bottom: 12px;
+}
+
+.emoji-category-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding: 0 4px;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+}
+
+.emoji-option {
+    font-size: 28px;
+    padding: 8px;
+    cursor: pointer;
+    text-align: center;
+    border-radius: 8px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.emoji-option:hover {
+    background: var(--bg-secondary);
+    transform: scale(1.1);
+}
+
+.emoji-option:active {
+    transform: scale(0.95);
+}
+
+.emoji-picker-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.no-emoji {
+    border: 2px dashed var(--border);
+    background: var(--bg-secondary);
+}
+
+/* ---- Goal link styling ---- */
+.goal-link {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.goal-link i {
+    font-size: 10px;
+}
+
+/* ---- Date group headers ---- */
+.date-group-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 4px 6px 4px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.date-group-header.someday {
+    opacity: 0.65;
+    font-style: italic;
+}
+
+/* Collapsible group toggle */
+.task-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 6px 6px 4px;
+    transition: background 0.12s ease;
+}
+
+.task-group-toggle:hover {
+    background: var(--bg-secondary);
+}
+
+.task-group-chevron {
+    font-size: 9px;
+    opacity: 0.45;
+    transition: transform 0.2s ease;
+}
+
+/* ---- Truncate notes to 2 lines ---- */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ---- Analytics period selector ---- */
+.period-btn {
+    padding: 0.5rem 1rem;
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    cursor: pointer;
+}
+
+.period-btn:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.period-btn.active {
+    background-color: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* ---- Chart containers ---- */
+.chart-container {
+    position: relative;
+    height: 200px;
+    margin-bottom: 1rem;
+}
+
+.chart-container-small {
+    position: relative;
+    height: 150px;
+    margin-bottom: 1rem;
+}
+
+/* ---- Category item drag-over ---- */
+.category-item.drag-over {
+    border: 2px dashed var(--accent);
+    background-color: rgba(0,122,255,0.06);
+}
+
+.category-item {
+    transition: all 0.2s ease;
+}
+
+/* ---- Dark mode text/bg overrides for Tailwind hardcoded classes ---- */
+body.dark .bg-white      { background-color: var(--bg-primary) !important; }
+body.dark .bg-gray-50    { background-color: var(--bg-secondary) !important; }
+body.dark .bg-gray-100   { background-color: var(--bg-secondary) !important; }
+body.dark .bg-gray-200   { background-color: var(--bg-tertiary) !important; }
+body.dark .text-gray-900 { color: var(--text-primary) !important; }
+body.dark .text-gray-800 { color: var(--text-primary) !important; }
+body.dark .text-gray-700 { color: var(--text-primary) !important; }
+body.dark .text-gray-600 { color: var(--text-secondary) !important; }
+/* ---- Calendar date strip ---- */
+#date-strip-scroll::-webkit-scrollbar { display: none; }
+
+.date-pill {
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.date-pill:active {
+    transform: scale(0.95);
+}
+
+.date-pill.selected {
+    box-shadow: 0 2px 8px rgba(0,122,255,0.35);
+}
+
+/* Upcoming task list fills available panel space */
+.upcoming-task-list {
+    /* let the panel scroll handle overflow — no inner scroll */
+}
+
+/* ---- Dark mode overrides ---- */
+body.dark .text-gray-500 { color: var(--text-secondary) !important; }
+body.dark .text-gray-400 { color: var(--text-secondary) !important; }
+body.dark .border-gray-200 { border-color: var(--border) !important; }
+body.dark .border-gray-100 { border-color: var(--border) !important; }
+body.dark .divide-gray-200 > * { border-color: var(--border) !important; }
+body.dark input,
+body.dark select,
+body.dark textarea {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+}
+body.dark input::placeholder,
+body.dark textarea::placeholder {
+    color: var(--text-secondary) !important;
+}
+
+/* ---- Analytics summary cards dark mode ---- */
+body.dark .analytics-summary-card {
+    background: var(--bg-secondary);
+}
+
+/* ---- Additional dark mode overrides ---- */
+/* Blue/purple info blocks */
+body.dark .bg-blue-50  { background-color: var(--bg-secondary) !important; }
+body.dark .bg-blue-100 { background-color: var(--bg-tertiary)  !important; }
+body.dark .border-blue-200 { border-color: var(--border) !important; }
+body.dark .text-blue-800 { color: var(--text-primary) !important; }
+body.dark .text-blue-700 { color: var(--text-primary) !important; }
+
+/* Gradient insight cards — override gradient stops to dark */
+body.dark .from-blue-50   { --tw-gradient-from: var(--bg-secondary) !important; }
+body.dark .from-purple-50 { --tw-gradient-from: var(--bg-secondary) !important; }
+body.dark .from-indigo-50 { --tw-gradient-from: var(--bg-secondary) !important; }
+body.dark .to-purple-50   { --tw-gradient-to: var(--bg-tertiary) !important; }
+body.dark .to-blue-50     { --tw-gradient-to: var(--bg-tertiary) !important; }
+body.dark .to-indigo-50   { --tw-gradient-to: var(--bg-tertiary) !important; }
+
+/* Hover state flashes */
+body.dark .hover\:bg-gray-50:hover  { background-color: var(--bg-secondary) !important; }
+body.dark .hover\:bg-gray-100:hover { background-color: var(--bg-tertiary)  !important; }
+
+/* Header, nav and modal backdrop */
+body.dark header { background-color: var(--bg-secondary) !important; border-color: var(--border) !important; }
+body.dark header h1 { color: var(--text-primary) !important; }
+body.dark header .text-gray-600 { color: var(--text-secondary) !important; }
+
+/* Modal inner panels */
+body.dark .modal-content { background-color: var(--bg-secondary); }
+body.dark label { color: var(--text-secondary) !important; }
+
+/* Category list hover */
+body.dark .category-item { background: none; }
+body.dark .category-item:hover { background-color: var(--bg-secondary) !important; }
