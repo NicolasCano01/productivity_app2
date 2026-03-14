@@ -30,14 +30,11 @@ function startMidnightWatcher() {
     }, 60000); // check every minute
 }
 
-// Main app initialization function
+// Main app initialization function (called after auth is confirmed)
 async function initApp() {
     console.log('🚀 Initializing Productivity Hub...');
 
-    // Step 0: Apply saved dark mode preference before anything renders
-    initDarkMode();
-
-    // Step 1: Initialize Supabase
+    // Step 1: Connect Supabase (client already created in boot, this tests the connection)
     const supabaseReady = await initializeSupabase();
     if (!supabaseReady) {
         hideLoadingScreen();
@@ -110,9 +107,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ============================================
+// BOOT: check auth session before loading data
+// ============================================
+async function boot() {
+    // Build the Supabase client first (no DB query yet)
+    const { createClient } = supabase;
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    initDarkMode();
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+        // Not logged in — hide loading screen and show login modal
+        hideLoadingScreen();
+        showLoginModal();
+        return;
+    }
+
+    // Already authenticated — load the app normally
+    initApp();
+}
+
 // Start the app when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', boot);
 } else {
-    initApp();
+    boot();
 }

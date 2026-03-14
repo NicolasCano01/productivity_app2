@@ -672,3 +672,15 @@ body.dark label { color: var(--text-secondary) !important; }
 /* Category list hover */
 body.dark .category-item { background: none; }
 body.dark .category-item:hover { background-color: var(--bg-secondary) !important; }
+
+/* Login modal dark mode */
+body.dark #login-modal > div {
+    background-color: var(--bg-secondary) !important;
+}
+body.dark #login-modal h2,
+body.dark #login-modal p { color: var(--text-primary) !important; }
+body.dark #login-modal input {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border) !important;
+    color: var(--text-primary) !important;
+}

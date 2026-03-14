@@ -2,14 +2,61 @@
 // PRODUCTIVITY HUB - SUPABASE DATABASE
 // ============================================
 
+// ============================================
+// AUTH HELPERS
+// ============================================
+
+function showLoginModal() {
+    document.getElementById('login-modal').classList.remove('hidden');
+}
+function hideLoginModal() {
+    document.getElementById('login-modal').classList.add('hidden');
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const btn      = document.getElementById('login-btn');
+    const errEl    = document.getElementById('login-error');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
+    errEl.classList.add('hidden');
+
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+    } else {
+        hideLoginModal();
+        initApp();
+    }
+}
+
+async function signOut() {
+    await supabaseClient.auth.signOut();
+    location.reload();
+}
+
+// ============================================
+// SUPABASE CLIENT INIT
+// ============================================
+
 // Initialize Supabase Client
 async function initializeSupabase() {
     try {
         console.log('🔌 Connecting to Supabase...');
-        
-        const { createClient } = supabase;
-        supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
+        // Client is created in boot(); only create here if somehow missing
+        if (!supabaseClient) {
+            const { createClient } = supabase;
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
         // Test connection
         const { data, error } = await supabaseClient
             .from('categories')
