@@ -112,8 +112,8 @@ async function fetchInitialData() {
         appState.habitStreaks = streaks;
         console.log(`✅ Loaded ${streaks.length} habit streaks`);
         
-        // Fetch tasks
-        const { data: tasks, error: taskError } = await supabaseClient
+        // Fetch active tasks
+        const { data: activeTasks, error: activeTaskError } = await supabaseClient
             .from('tasks')
             .select(`
                 *,
@@ -124,9 +124,27 @@ async function fetchInitialData() {
             .order('user_order', { ascending: true, nullsFirst: false })
             .order('due_date', { ascending: true, nullsFirst: false });
 
-        if (taskError) throw taskError;
-        appState.tasks = tasks;
-        console.log(`✅ Loaded ${tasks.length} tasks`);
+        if (activeTaskError) throw activeTaskError;
+
+        // Fetch soft-deleted tasks (within 30-day retention window)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const { data: deletedTasks, error: deletedTaskError } = await supabaseClient
+            .from('tasks')
+            .select(`
+                *,
+                category:categories(id, name, color_hex),
+                goal:goals(id, name)
+            `)
+            .eq('status', 'deleted')
+            .not('deleted_at', 'is', null)
+            .gte('deleted_at', thirtyDaysAgo.toISOString())
+            .order('deleted_at', { ascending: false });
+
+        if (deletedTaskError) throw deletedTaskError;
+
+        appState.tasks = [...activeTasks, ...deletedTasks];
+        console.log(`✅ Loaded ${activeTasks.length} active tasks + ${deletedTasks.length} deleted tasks`);
         
         // Fetch goals: active + recently-archived (for analytics), exclude deleted
         const { data: goals, error: goalError } = await supabaseClient

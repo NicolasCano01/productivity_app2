@@ -2,7 +2,7 @@
 // PRODUCTIVITY HUB - TASKS PANEL (ENHANCED)
 // ============================================
 
-// Switch task view (All/Overdue/Upcoming/Completed)
+// Switch task view (All/Overdue/Upcoming/Completed/Deleted)
 function switchTaskView(view) {
     currentTaskView = view;
     
@@ -25,8 +25,11 @@ function getFilteredTasks() {
     today.setHours(0, 0, 0, 0);
     
     // Apply view filter
-    if (currentTaskView === 'overdue') {
+    if (currentTaskView === 'deleted') {
+        filtered = filtered.filter(task => task.status === 'deleted' && task.deleted_at);
+    } else if (currentTaskView === 'overdue') {
         filtered = filtered.filter(task => {
+            if (task.status === 'deleted') return false;
             if (task.is_completed || !task.due_date) return false;
             const dueDate = new Date(task.due_date);
             dueDate.setHours(0, 0, 0, 0);
@@ -35,6 +38,7 @@ function getFilteredTasks() {
     } else if (currentTaskView === 'upcoming') {
         // Include tasks with future dates OR no date (but not completed)
         filtered = filtered.filter(task => {
+            if (task.status === 'deleted') return false;
             if (task.is_completed) return false;
             if (!task.due_date) return true; // Include tasks with no date
             const dueDate = new Date(task.due_date);
@@ -42,10 +46,10 @@ function getFilteredTasks() {
             return dueDate >= today;
         });
     } else if (currentTaskView === 'completed') {
-        filtered = filtered.filter(task => task.is_completed);
+        filtered = filtered.filter(task => task.status !== 'deleted' && task.is_completed);
     } else {
-        // All - show only active (not completed)
-        filtered = filtered.filter(task => !task.is_completed);
+        // All - show only active (not completed, not deleted)
+        filtered = filtered.filter(task => task.status !== 'deleted' && !task.is_completed);
     }
     
     // Apply search filter
@@ -271,10 +275,11 @@ function renderTasks() {
     const filtered = getFilteredTasks();
     
     // Update counts
-    const activeTasks = appState.tasks.filter(t => !t.is_completed);
+    const nonDeletedTasks = appState.tasks.filter(t => t.status !== 'deleted');
+    const activeTasks = nonDeletedTasks.filter(t => !t.is_completed);
     const today = getMelbourneDate();
     today.setHours(0, 0, 0, 0);
-    
+
     const overdueTasks = activeTasks.filter(t => {
         if (!t.due_date) return false;
         const dueDate = new Date(t.due_date);
@@ -287,18 +292,24 @@ function renderTasks() {
         dueDate.setHours(0, 0, 0, 0);
         return dueDate >= today;
     });
-    const completedTasks = appState.tasks.filter(t => t.is_completed);
-    
+    const completedTasks = nonDeletedTasks.filter(t => t.is_completed);
+    const deletedTasks = appState.tasks.filter(t => t.status === 'deleted' && t.deleted_at);
+
     document.getElementById('count-all').textContent = activeTasks.length;
     document.getElementById('count-overdue').textContent = overdueTasks.length;
     document.getElementById('count-upcoming').textContent = upcomingTasks.length;
     document.getElementById('count-completed').textContent = completedTasks.length;
+    document.getElementById('count-deleted').textContent = deletedTasks.length;
     
     if (filtered.length === 0) {
+        const emptyIcon = currentTaskView === 'deleted' ? 'fa-trash-alt' : 'fa-tasks';
+        const emptyMsg = currentTaskView === 'all' ? 'No tasks yet. Tap + to add one!' :
+                         currentTaskView === 'deleted' ? 'No deleted tasks' :
+                         `No ${currentTaskView} tasks`;
         tasksList.innerHTML = `
             <div class="text-center text-gray-500 py-8">
-                <i class="fas fa-tasks text-4xl mb-2"></i>
-                <p>${currentTaskView === 'all' ? 'No tasks yet. Tap + to add one!' : `No ${currentTaskView} tasks`}</p>
+                <i class="fas ${emptyIcon} text-4xl mb-2"></i>
+                <p>${emptyMsg}</p>
             </div>
         `;
         return;
@@ -341,6 +352,16 @@ function renderTasks() {
         });
         
         tasksList.innerHTML = html;
+    } else if (currentTaskView === 'deleted') {
+        // Sort deleted tasks by deleted_at desc (newest first)
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.deleted_at || 0);
+            const dateB = new Date(b.deleted_at || 0);
+            return dateB - dateA;
+        });
+
+        // No grouping for Deleted view — flat list
+        tasksList.innerHTML = `<div class="space-y-2">${filtered.map(task => renderTaskCard(task)).join('')}</div>`;
     } else {
         // Sort completed tasks by completion date (most recent first)
         if (currentTaskView === 'completed') {
@@ -350,7 +371,7 @@ function renderTasks() {
                 return dateB - dateA; // Descending order (newest first)
             });
         }
-        
+
         // No grouping for Completed view
         tasksList.innerHTML = `<div class="space-y-2">${filtered.map(task => renderTaskCard(task)).join('')}</div>`;
     }
@@ -358,10 +379,11 @@ function renderTasks() {
 
 // Render individual task card
 function renderTaskCard(task, dateGroup = null) {
+    const isDeleted = task.status === 'deleted';
     const categoryColor = task.category?.color_hex || '#6B7280';
-    const severity = getOverdueSeverity(task.due_date);
+    const severity = isDeleted ? null : getOverdueSeverity(task.due_date);
     const dueDateText = formatDueDate(task.due_date);
-    
+
     // Add drag handlers only when in grouped view (upcoming/overdue)
     const dragHandlers = dateGroup ? `
         draggable="true"
@@ -371,7 +393,7 @@ function renderTaskCard(task, dateGroup = null) {
         ondrop="handleTaskDrop(event, '${task.id}', '${dateGroup}')"
         ondragleave="handleTaskDragLeave(event)"
     ` : '';
-    
+
     const metaParts = [];
     if (task.category) metaParts.push(`<span>${task.category.name}</span>`);
     if (task.goal) metaParts.push(`<span class="goal-link"><i class="fas fa-bullseye" style="font-size:9px"></i> ${task.goal.name}</span>`);
@@ -379,7 +401,41 @@ function renderTaskCard(task, dateGroup = null) {
         metaParts.push(`<span class="${severity ? 'font-semibold' : ''}" style="color:${severity ? 'var(--danger)' : 'var(--text-secondary)'}">${dueDateText}</span>`);
     }
     if (task.is_recurring) metaParts.push(`<span style="color:var(--accent)"><i class="fas fa-repeat" style="font-size:9px"></i> Recurring</span>`);
+    if (isDeleted && task.deleted_at) {
+        const deletedDate = new Date(task.deleted_at);
+        const deletedText = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        metaParts.push(`<span style="color:var(--danger)"><i class="fas fa-trash-alt" style="font-size:9px"></i> Deleted ${deletedText}</span>`);
+    }
     const metaHtml = metaParts.length ? `<div class="flex items-center gap-1.5 mt-0.5 flex-wrap" style="font-size:11px;color:var(--text-secondary)">${metaParts.join('<span style="opacity:0.4">·</span>')}</div>` : '';
+
+    // Deleted tasks: show restore button, no checkbox
+    if (isDeleted) {
+        return `
+            <div class="task-card deleted-task">
+                <div class="flex items-start gap-3">
+                    <button
+                        class="touch-target flex items-center justify-center rounded-full hover:bg-green-100 transition"
+                        style="width:28px;height:28px;min-width:28px;color:var(--success);margin-top:2px"
+                        onclick="restoreTask('${task.id}')"
+                        title="Restore task"
+                    >
+                        <i class="fas fa-undo" style="font-size:14px"></i>
+                    </button>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            ${task.category ? `<div class="category-dot" style="background-color:${categoryColor}"></div>` : ''}
+                            <h3 class="font-semibold flex-1 truncate" style="font-size:15px;color:var(--text-secondary);text-decoration:line-through">
+                                ${escapeHtml(task.title)}
+                            </h3>
+                        </div>
+                        ${metaHtml}
+                        ${task.notes ? `<p class="line-clamp-2 mt-1" style="font-size:12px;color:var(--text-secondary)">${escapeHtml(task.notes)}</p>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
     return `
         <div class="task-card ${task.is_completed ? 'completed' : ''}" ${dragHandlers}>
@@ -712,14 +768,72 @@ async function deleteTask() {
     // Soft-delete after undo window
     deleteTimer = setTimeout(async () => {
         try {
+            const deletedAt = new Date().toISOString();
             const { error } = await supabaseClient
                 .from('tasks')
-                .update({ status: 'deleted', deleted_at: new Date().toISOString() })
+                .update({ status: 'deleted', deleted_at: deletedAt })
                 .eq('id', deletedTaskId);
             if (error) throw error;
             console.log('✅ Task soft-deleted (will purge in 30 days)');
+
+            // Add the deleted task back into appState so it shows in Deleted view
+            deletedTask.status = 'deleted';
+            deletedTask.deleted_at = deletedAt;
+            appState.tasks.push(deletedTask);
+            renderTasks();
         } catch (error) {
             console.error('Error soft-deleting task:', error);
         }
     }, 5000);
+}
+
+// Restore a soft-deleted task
+async function restoreTask(taskId) {
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Optimistic update
+    const previousStatus = task.status;
+    const previousDeletedAt = task.deleted_at;
+    task.status = 'active';
+    task.deleted_at = null;
+    renderTasks();
+    showToast('Task restored!', 'success');
+
+    try {
+        const { error } = await supabaseClient
+            .from('tasks')
+            .update({ status: 'pending', deleted_at: null })
+            .eq('id', taskId);
+
+        if (error) throw error;
+
+        // Refetch the restored task to get correct server state
+        const { data: updatedTask, error: fetchError } = await supabaseClient
+            .from('tasks')
+            .select(`
+                *,
+                category:categories(id, name, color_hex),
+                goal:goals(id, name)
+            `)
+            .eq('id', taskId)
+            .single();
+
+        if (!fetchError && updatedTask) {
+            const taskIndex = appState.tasks.findIndex(t => t.id === taskId);
+            if (taskIndex !== -1) {
+                appState.tasks[taskIndex] = updatedTask;
+            }
+            renderTasks();
+        }
+
+        console.log('✅ Task restored successfully');
+    } catch (error) {
+        console.error('Error restoring task:', error);
+        // Revert optimistic update
+        task.status = previousStatus;
+        task.deleted_at = previousDeletedAt;
+        renderTasks();
+        showToast('Failed to restore task', 'error');
+    }
 }

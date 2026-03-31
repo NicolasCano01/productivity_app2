@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Productivity Hub - Track habits, tasks, goals, and analyze your productivity">
-    <meta name="theme-color" content="#3B82F6">
+    <meta name="theme-color" content="#007AFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Productivity Hub</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
     
     <!-- CDN Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -116,6 +121,9 @@
                     </button>
                     <button class="filter-btn" data-view="completed" onclick="switchTaskView('completed')">
                         Completed <span id="count-completed" class="ml-1">0</span>
+                    </button>
+                    <button class="filter-btn" data-view="deleted" onclick="switchTaskView('deleted')">
+                        <i class="fas fa-trash-alt" style="font-size:11px"></i> Deleted <span id="count-deleted" class="ml-1">0</span>
                     </button>
                 </div>
                 
@@ -260,9 +268,9 @@
                             <i class="fas fa-bullseye text-primary"></i>
                             Goals
                         </h3>
-                        <i id="goals-collapse-icon" class="fas fa-chevron-up text-gray-500 transition-transform"></i>
+                        <i id="goals-collapse-icon" class="fas fa-chevron-down text-gray-500 transition-transform"></i>
                     </div>
-                    <div id="goals-analytics-content">
+                    <div id="goals-analytics-content" class="hidden">
                         <div id="goal-summary-cards"></div>
                         <div id="goal-charts"></div>
                     </div>

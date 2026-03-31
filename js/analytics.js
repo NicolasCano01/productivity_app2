@@ -21,7 +21,7 @@ let insightCharts = {};
 let sectionStates = {
     habits: true,    // expanded by default
     tasks: true,     // expanded by default
-    goals: true,     // expanded by default
+    goals: false,    // collapsed by default
     insights: true   // expanded by default
 };
 
@@ -52,12 +52,11 @@ function renderAnalyticsSummaryBar() {
 
     const melbToday = getMelbourneDate();
     melbToday.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(melbToday);
-    weekEnd.setDate(weekEnd.getDate() + 7);
+    const { start: weekStart, end: weekEnd } = getMelbourneWeekRange();
     const tasksDueThisWeek = appState.tasks.filter(t => {
         if (t.is_completed || !t.due_date) return false;
         const due = new Date(t.due_date + 'T00:00:00');
-        return due >= melbToday && due < weekEnd;
+        return due >= weekStart && due <= weekEnd;
     }).length;
 
     const activeGoalCount = appState.goals.filter(g => g.status === 'active').length;
@@ -276,54 +275,72 @@ function renderHabitCharts() {
 function createHabitCompletionChart() {
     const ctx = document.getElementById('habit-completion-chart');
     if (!ctx) return;
-    
+
     const { startDate, endDate } = getDateRange(currentPeriod);
     const dailyHabits = appState.habits.filter(h => h.frequency === 'daily');
-    
+
     if (dailyHabits.length === 0) {
         ctx.parentElement.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">No daily habits to display</div>';
         return;
     }
-    
-    // Generate date labels and data points
+
+    // Generate date labels, data points, and metadata for tooltips
     const labels = [];
     const data = [];
+    const tooltipMeta = []; // Store extra info for tooltip
     let currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
         const dateStr = formatDateForDB(currentDate);
         labels.push(formatDateLabel(currentDate));
-        
+
         // Calculate completion rate for this specific date
         let expectedHabits = 0;
         let completedHabits = 0;
-        
+
         dailyHabits.forEach(habit => {
             const dayOfWeek = currentDate.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-            
+
             // Count if not exempt weekend or not a weekend
             if (!habit.exempt_weekends || !isWeekend) {
                 expectedHabits++;
-                
+
                 // Check if completed on this date
-                const isCompleted = appState.habitCompletions.some(c => 
+                const isCompleted = appState.habitCompletions.some(c =>
                     c.habit_id === habit.id && c.completion_date === dateStr
                 );
-                
+
                 if (isCompleted) completedHabits++;
             }
         });
-        
+
         const rate = expectedHabits > 0 ? Math.round((completedHabits / expectedHabits) * 100) : 0;
         data.push(rate);
-        
+
+        // Store tooltip metadata
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        tooltipMeta.push({
+            dayName: dayNames[currentDate.getDay()],
+            dateLabel: `${currentDate.getMonth()+1}/${currentDate.getDate()}`,
+            completed: completedHabits,
+            expected: expectedHabits
+        });
+
         currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     const accentColor = getCSSVar('--success') || '#34C759';
-    const gridColor = isDarkMode() ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+    const dark = isDarkMode();
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const tickColor = dark ? '#98989D' : '#6E6E73';
     const longRange = typeof currentPeriod === 'number' && currentPeriod > 14;
+
+    // Create gradient fill
+    const chartCtx = ctx.getContext('2d');
+    const gradient = chartCtx.createLinearGradient(0, 0, 0, 280);
+    gradient.addColorStop(0, dark ? 'rgba(52,199,89,0.35)' : 'rgba(52,199,89,0.25)');
+    gradient.addColorStop(1, dark ? 'rgba(52,199,89,0.02)' : 'rgba(52,199,89,0.02)');
 
     habitCharts.completionTrend = new Chart(ctx, {
         type: 'line',
@@ -333,12 +350,15 @@ function createHabitCompletionChart() {
                 label: 'Completion Rate',
                 data: data,
                 borderColor: accentColor,
-                backgroundColor: accentColor.startsWith('#') ? accentColor + '18' : 'rgba(52,199,89,0.1)',
+                backgroundColor: gradient,
                 tension: 0.4,
                 fill: true,
-                pointRadius: longRange ? 0 : 3,
-                pointHoverRadius: 5,
-                borderWidth: 2
+                pointRadius: longRange ? 2 : 4,
+                pointHoverRadius: 7,
+                pointBackgroundColor: accentColor,
+                pointBorderColor: dark ? '#1C1C1E' : '#FFFFFF',
+                pointBorderWidth: 2,
+                borderWidth: 3
             }]
         },
         options: {
@@ -347,23 +367,39 @@ function createHabitCompletionChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: isDarkMode() ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: dark ? '#FFFFFF' : '#FFFFFF',
+                    bodyColor: dark ? '#E5E5EA' : '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
                     padding: 10,
+                    cornerRadius: 8,
                     callbacks: {
-                        label: ctx => `Completion: ${ctx.parsed.y}%`
+                        title: function(tooltipItems) {
+                            const idx = tooltipItems[0].dataIndex;
+                            const meta = tooltipMeta[idx];
+                            return `${meta.dayName} ${meta.dateLabel}`;
+                        },
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const meta = tooltipMeta[idx];
+                            return `${context.parsed.y}% (${meta.completed}/${meta.expected} habits)`;
+                        }
                     }
                 }
             },
             scales: {
                 x: {
-                    ticks: { font: { size: 10 }, maxRotation: 0, maxTicksLimit: longRange ? 8 : 7 },
-                    grid: { display: false }
+                    ticks: { font: { size: 10 }, color: tickColor, maxRotation: 0, maxTicksLimit: longRange ? 8 : 7 },
+                    grid: { display: false },
+                    border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
                 },
                 y: {
                     beginAtZero: true,
                     max: 100,
-                    ticks: { font: { size: 10 }, maxTicksLimit: 5, callback: v => v + '%' },
-                    grid: { color: gridColor }
+                    ticks: { font: { size: 10 }, color: tickColor, maxTicksLimit: 5, callback: v => v + '%' },
+                    grid: { color: gridColor },
+                    border: { display: false }
                 }
             }
         }
@@ -399,6 +435,10 @@ function createHabitPerformanceChart() {
         return '#EF4444'; // Red
     });
     
+    const dark = isDarkMode();
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const tickColor = dark ? '#98989D' : '#6E6E73';
+
     habitCharts.performance = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -419,15 +459,15 @@ function createHabitPerformanceChart() {
                     display: false
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
                     padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
-                    },
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
                     callbacks: {
                         label: function(context) {
                             return 'Completion: ' + context.parsed.x + '%';
@@ -439,27 +479,14 @@ function createHabitPerformanceChart() {
                 x: {
                     beginAtZero: true,
                     max: 100,
-                    ticks: {
-                        font: {
-                            size: 10
-                        },
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor, callback: v => v + '%' },
+                    grid: { color: gridColor },
+                    border: { display: false }
                 },
                 y: {
-                    ticks: {
-                        font: {
-                            size: 10
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor },
+                    grid: { display: false },
+                    border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
                 }
             }
         }
@@ -598,6 +625,31 @@ function createTaskCompletionChart() {
         currentDate.setDate(currentDate.getDate() + 1);
     }
     
+    const dark = isDarkMode();
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const tickColor = dark ? '#98989D' : '#6E6E73';
+    const longRange = typeof currentPeriod === 'number' && currentPeriod > 14;
+
+    // Create gradient fill
+    const chartCtx = ctx.getContext('2d');
+    const gradient = chartCtx.createLinearGradient(0, 0, 0, 280);
+    gradient.addColorStop(0, dark ? 'rgba(168,85,247,0.35)' : 'rgba(168,85,247,0.25)');
+    gradient.addColorStop(1, dark ? 'rgba(168,85,247,0.02)' : 'rgba(168,85,247,0.02)');
+
+    // Build tooltip metadata
+    const tooltipMeta = [];
+    let tmpDate = new Date(startDate);
+    let tmpIdx = 0;
+    while (tmpDate <= endDate) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        tooltipMeta.push({
+            dayName: dayNames[tmpDate.getDay()],
+            dateLabel: `${tmpDate.getMonth()+1}/${tmpDate.getDate()}`
+        });
+        tmpDate.setDate(tmpDate.getDate() + 1);
+        tmpIdx++;
+    }
+
     taskCharts.completionTrend = new Chart(ctx, {
         type: 'line',
         data: {
@@ -606,56 +658,56 @@ function createTaskCompletionChart() {
                 label: 'Tasks Completed',
                 data: data,
                 borderColor: '#A855F7',
-                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                backgroundColor: gradient,
                 tension: 0.3,
                 fill: true,
-                pointRadius: 3,
-                pointHoverRadius: 5
+                pointRadius: longRange ? 2 : 4,
+                pointHoverRadius: 7,
+                pointBackgroundColor: '#A855F7',
+                pointBorderColor: dark ? '#1C1C1E' : '#FFFFFF',
+                pointBorderWidth: 2,
+                borderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const idx = tooltipItems[0].dataIndex;
+                            const meta = tooltipMeta[idx];
+                            return meta ? `${meta.dayName} ${meta.dateLabel}` : '';
+                        },
+                        label: function(context) {
+                            const count = context.parsed.y;
+                            return `${count} task${count !== 1 ? 's' : ''} completed`;
+                        }
                     }
                 }
             },
             scales: {
                 x: {
-                    ticks: {
-                        font: {
-                            size: 10
-                        },
-                        maxRotation: 45,
-                        minRotation: 0
-                    },
-                    grid: {
-                        display: false
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor, maxRotation: 0, maxTicksLimit: longRange ? 8 : 7 },
+                    grid: { display: false },
+                    border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        font: {
-                            size: 10
-                        },
-                        stepSize: 1
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor, stepSize: 1 },
+                    grid: { color: gridColor },
+                    border: { display: false }
                 }
             }
         }
@@ -710,6 +762,10 @@ function createTaskCategoryChart() {
         return;
     }
     
+    const dark = isDarkMode();
+    const legendTextColor = dark ? '#FFFFFF' : '#1D1D1F';
+    const sliceBorderColor = dark ? '#1C1C1E' : '#FFFFFF';
+
     taskCharts.categoryBreakdown = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -717,8 +773,10 @@ function createTaskCategoryChart() {
             datasets: [{
                 data: data,
                 backgroundColor: colors,
-                borderWidth: 2,
-                borderColor: '#ffffff'
+                borderWidth: 3,
+                borderColor: sliceBorderColor,
+                hoverBorderColor: sliceBorderColor,
+                hoverBorderWidth: 4
             }]
         },
         options: {
@@ -730,18 +788,23 @@ function createTaskCategoryChart() {
                     position: 'bottom',
                     labels: {
                         boxWidth: 12,
-                        padding: 8,
+                        padding: 10,
+                        color: legendTextColor,
                         font: {
                             size: 11
                         },
                         generateLabels: function(chart) {
-                            const data = chart.data;
-                            if (data.labels.length && data.datasets.length) {
-                                return data.labels.map((label, i) => {
-                                    const value = data.datasets[0].data[i];
+                            const d = chart.data;
+                            if (d.labels.length && d.datasets.length) {
+                                const total = d.datasets[0].data.reduce((a, b) => a + b, 0);
+                                return d.labels.map((label, i) => {
+                                    const value = d.datasets[0].data[i];
+                                    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
                                     return {
-                                        text: `${label}: ${value}`,
-                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        text: `${label}: ${value} (${pct}%)`,
+                                        fillStyle: d.datasets[0].backgroundColor[i],
+                                        strokeStyle: sliceBorderColor,
+                                        fontColor: legendTextColor,
                                         hidden: false,
                                         index: i
                                     };
@@ -752,15 +815,15 @@ function createTaskCategoryChart() {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
-                    },
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
                     callbacks: {
                         label: function(context) {
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -774,22 +837,25 @@ function createTaskCategoryChart() {
     });
 }
 
-// Task velocity — 8-week bar chart of completed tasks per week
+// Task velocity — 8-week bar chart of completed tasks per Mon-Sun week
 function createTaskVelocityChart() {
     const ctx = document.getElementById('task-velocity-chart');
     if (!ctx) return;
 
     const weeks = [];
     const counts = [];
-    const now = getMelbourneDate();
-    now.setHours(23, 59, 59, 999);
 
+    // Find the Monday of the current week
+    const { start: currentMonday } = getMelbourneWeekRange();
+
+    // Go back 7 weeks from current week (8 weeks total including current)
     for (let i = 7; i >= 0; i--) {
-        const weekEnd = new Date(now);
-        weekEnd.setDate(weekEnd.getDate() - i * 7);
-        const weekStart = new Date(weekEnd);
-        weekStart.setDate(weekStart.getDate() - 6);
+        const weekStart = new Date(currentMonday);
+        weekStart.setDate(currentMonday.getDate() - i * 7);
         weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
 
         const label = `${weekStart.getMonth()+1}/${weekStart.getDate()}`;
         weeks.push(label);
@@ -804,6 +870,9 @@ function createTaskVelocityChart() {
 
     const accentColor = getCSSVar('--accent') || '#007AFF';
     const gridColor = isDarkMode() ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+
+    const dark = isDarkMode();
+    const tickColor = dark ? '#98989D' : '#6E6E73';
 
     if (taskCharts.velocity) taskCharts.velocity.destroy();
     taskCharts.velocity = new Chart(ctx, {
@@ -821,10 +890,27 @@ function createTaskVelocityChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(context) {
+                            const count = context.parsed.y;
+                            return `${count} task${count !== 1 ? 's' : ''} completed`;
+                        }
+                    }
+                }
+            },
             scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1, maxTicksLimit: 5, font: { size: 10 } }, grid: { color: gridColor } },
-                x: { ticks: { font: { size: 10 }, maxRotation: 0 }, grid: { display: false } }
+                y: { beginAtZero: true, ticks: { stepSize: 1, maxTicksLimit: 5, font: { size: 10 }, color: tickColor }, grid: { color: gridColor }, border: { display: false } },
+                x: { ticks: { font: { size: 10 }, color: tickColor, maxRotation: 0 }, grid: { display: false }, border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' } }
             }
         }
     });
@@ -1016,6 +1102,10 @@ function createGoalProgressChart() {
     const data = goalData.map(g => g.progress);
     const colors = goalData.map(g => g.color);
     
+    const dark = isDarkMode();
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+    const tickColor = dark ? '#98989D' : '#6E6E73';
+
     goalCharts.progressOverview = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1025,7 +1115,7 @@ function createGoalProgressChart() {
                 data: data,
                 backgroundColor: colors,
                 borderRadius: 4,
-                barThickness: 20, // Fixed bar thickness for consistent sizing
+                barThickness: 20,
                 maxBarThickness: 25
             }]
         },
@@ -1034,19 +1124,17 @@ function createGoalProgressChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
                     padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
-                    },
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
                     callbacks: {
                         label: function(context) {
                             return 'Progress: ' + context.parsed.x + '%';
@@ -1058,37 +1146,17 @@ function createGoalProgressChart() {
                 x: {
                     beginAtZero: true,
                     max: 100,
-                    ticks: {
-                        font: {
-                            size: 10
-                        },
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor, callback: v => v + '%' },
+                    grid: { color: gridColor },
+                    border: { display: false }
                 },
                 y: {
-                    ticks: {
-                        font: {
-                            size: 10
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor },
+                    grid: { display: false },
+                    border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
                 }
             },
-            layout: {
-                padding: {
-                    left: 5,
-                    right: 5,
-                    top: 5,
-                    bottom: 5
-                }
-            }
+            layout: { padding: { left: 5, right: 5, top: 5, bottom: 5 } }
         }
     });
 }
@@ -1182,11 +1250,28 @@ function createGoalBurndownChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 10,
+                        font: { size: 10 },
+                        color: isDarkMode() ? '#FFFFFF' : '#1D1D1F'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: isDarkMode() ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: isDarkMode() ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8
+                }
             },
             scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1, maxTicksLimit: 5, font: { size: 10 } }, grid: { color: gridColor } },
-                x: { ticks: { maxTicksLimit: 6, maxRotation: 0, font: { size: 10 } }, grid: { display: false } }
+                y: { beginAtZero: true, ticks: { stepSize: 1, maxTicksLimit: 5, font: { size: 10 }, color: isDarkMode() ? '#98989D' : '#6E6E73' }, grid: { color: gridColor }, border: { display: false } },
+                x: { ticks: { maxTicksLimit: 6, maxRotation: 0, font: { size: 10 }, color: isDarkMode() ? '#98989D' : '#6E6E73' }, grid: { display: false }, border: { color: isDarkMode() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' } }
             }
         }
     });
@@ -1240,6 +1325,10 @@ function createGoalStatusChart() {
         colors.push('#EF4444'); // Red
     }
     
+    const dark = isDarkMode();
+    const legendTextColor = dark ? '#FFFFFF' : '#1D1D1F';
+    const sliceBorderColor = dark ? '#1C1C1E' : '#FFFFFF';
+
     goalCharts.statusBreakdown = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -1247,8 +1336,10 @@ function createGoalStatusChart() {
             datasets: [{
                 data: data,
                 backgroundColor: colors,
-                borderWidth: 2,
-                borderColor: '#ffffff'
+                borderWidth: 3,
+                borderColor: sliceBorderColor,
+                hoverBorderColor: sliceBorderColor,
+                hoverBorderWidth: 4
             }]
         },
         options: {
@@ -1261,17 +1352,18 @@ function createGoalStatusChart() {
                     labels: {
                         boxWidth: 12,
                         padding: 8,
-                        font: {
-                            size: 11
-                        },
+                        color: legendTextColor,
+                        font: { size: 11 },
                         generateLabels: function(chart) {
-                            const data = chart.data;
-                            if (data.labels.length && data.datasets.length) {
-                                return data.labels.map((label, i) => {
-                                    const value = data.datasets[0].data[i];
+                            const d = chart.data;
+                            if (d.labels.length && d.datasets.length) {
+                                return d.labels.map((label, i) => {
+                                    const value = d.datasets[0].data[i];
                                     return {
                                         text: `${label}: ${value}`,
-                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        fillStyle: d.datasets[0].backgroundColor[i],
+                                        strokeStyle: sliceBorderColor,
+                                        fontColor: legendTextColor,
                                         hidden: false,
                                         index: i
                                     };
@@ -1282,15 +1374,15 @@ function createGoalStatusChart() {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
-                    },
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
                     callbacks: {
                         label: function(context) {
                             return context.label + ': ' + context.parsed + ' goals';
@@ -1381,19 +1473,20 @@ function renderInsights() {
 function calculateWeeklyComparison() {
     const today = getMelbourneDate();
     today.setHours(0, 0, 0, 0);
-    
-    // This week (last 7 days)
-    const thisWeekStart = new Date(today);
-    thisWeekStart.setDate(today.getDate() - 6);
-    
-    // Last week (7 days before that)
+
+    // This week (current Mon-Sun block)
+    const { start: thisWeekStart, end: thisWeekEnd } = getMelbourneWeekRange();
+
+    // Last week (previous Mon-Sun block)
     const lastWeekStart = new Date(thisWeekStart);
     lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+    lastWeekStart.setHours(0, 0, 0, 0);
     const lastWeekEnd = new Date(thisWeekStart);
     lastWeekEnd.setDate(thisWeekStart.getDate() - 1);
+    lastWeekEnd.setHours(23, 59, 59, 999);
     
     // Calculate habit completion rates
-    const thisWeekHabits = calculatePeriodHabitRate(thisWeekStart, today);
+    const thisWeekHabits = calculatePeriodHabitRate(thisWeekStart, thisWeekEnd);
     const lastWeekHabits = calculatePeriodHabitRate(lastWeekStart, lastWeekEnd);
     const habitChange = lastWeekHabits > 0 ? Math.round(((thisWeekHabits - lastWeekHabits) / lastWeekHabits) * 100) : 0;
     
@@ -1401,9 +1494,9 @@ function calculateWeeklyComparison() {
     const thisWeekTasks = appState.tasks.filter(t => {
         if (!t.is_completed || !t.completed_at) return false;
         const compDate = new Date(t.completed_at);
-        return compDate >= thisWeekStart && compDate <= today;
+        return compDate >= thisWeekStart && compDate <= thisWeekEnd;
     }).length;
-    
+
     const lastWeekTasks = appState.tasks.filter(t => {
         if (!t.is_completed || !t.completed_at) return false;
         const compDate = new Date(t.completed_at);
@@ -1423,9 +1516,9 @@ function calculateWeeklyComparison() {
         const thisWeekCompleted = allTasks.filter(t => {
             if (!t.is_completed || !t.completed_at) return false;
             const compDate = new Date(t.completed_at);
-            return compDate >= thisWeekStart && compDate <= today;
+            return compDate >= thisWeekStart && compDate <= thisWeekEnd;
         }).length;
-        
+
         const lastWeekCompleted = allTasks.filter(t => {
             if (!t.is_completed || !t.completed_at) return false;
             const compDate = new Date(t.completed_at);
@@ -1538,13 +1631,24 @@ function createBestDayChart() {
     
     const bestDayData = calculateBestDay();
     
-    const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const data = labels.map((_, index) => bestDayData.dayStats[index].total);
-    const colors = data.map((value, index) => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Map Mon-Sun label order to getDay() indices: Mon=1,Tue=2,...,Sat=6,Sun=0
+    const dayIndexOrder = [1, 2, 3, 4, 5, 6, 0];
+    const data = dayIndexOrder.map(idx => bestDayData.dayStats[idx].total);
+    const colors = data.map((value) => {
         // Highlight best day with primary color
         return value === bestDayData.bestDay.total ? '#3B82F6' : '#D1D5DB';
     });
     
+    const dark = isDarkMode();
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+    const tickColor = dark ? '#98989D' : '#6E6E73';
+    const accentColor = getCSSVar('--accent') || '#3B82F6';
+    const mutedBarColor = dark ? 'rgba(255,255,255,0.15)' : '#D1D5DB';
+    const bestDayColors = data.map((value) => {
+        return value === bestDayData.bestDay.total ? accentColor : mutedBarColor;
+    });
+
     insightCharts.bestDay = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1552,7 +1656,7 @@ function createBestDayChart() {
             datasets: [{
                 label: 'Total Activities',
                 data: data,
-                backgroundColor: colors,
+                backgroundColor: bestDayColors,
                 borderRadius: 4
             }]
         },
@@ -1560,22 +1664,21 @@ function createBestDayChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 8,
-                    bodyFont: {
-                        size: 12
-                    },
-                    titleFont: {
-                        size: 12,
-                        weight: 'bold'
-                    },
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    borderColor: dark ? '#3A3A3C' : 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    bodyFont: { size: 12 },
+                    titleFont: { size: 12, weight: 'bold' },
                     callbacks: {
                         label: function(context) {
-                            const dayIndex = context.dataIndex;
+                            const monSunOrder = [1, 2, 3, 4, 5, 6, 0];
+                            const dayIndex = monSunOrder[context.dataIndex];
                             const stats = bestDayData.dayStats[dayIndex];
                             return [
                                 `Total: ${stats.total}`,
@@ -1588,26 +1691,15 @@ function createBestDayChart() {
             },
             scales: {
                 x: {
-                    ticks: {
-                        font: {
-                            size: 10
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor },
+                    grid: { display: false },
+                    border: { color: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        font: {
-                            size: 10
-                        },
-                        stepSize: 1
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
+                    ticks: { font: { size: 10 }, color: tickColor, stepSize: 1 },
+                    grid: { color: gridColor },
+                    border: { display: false }
                 }
             }
         }
@@ -1641,18 +1733,24 @@ function formatDateLabel(date) {
 }
 
 function getDateRange(period) {
+    if (period === 7) {
+        // Use current Mon-Sun week block
+        const { start, end } = getMelbourneWeekRange();
+        return { startDate: start, endDate: end };
+    }
+
     const endDate = getMelbourneDate();
     endDate.setHours(23, 59, 59, 999);
 
     const startDate = getMelbourneDate();
     startDate.setHours(0, 0, 0, 0);
-    
+
     if (period === 'all') {
         // Set to earliest data point or 1 year ago, whichever is more recent
         startDate.setFullYear(startDate.getFullYear() - 1);
     } else {
         startDate.setDate(startDate.getDate() - period + 1);
     }
-    
+
     return { startDate, endDate };
 }

@@ -59,14 +59,14 @@ function buildCalendarHTML() {
 // UPCOMING VIEW (Things 3 style)
 // ============================================
 function buildUpcomingView(today, todayStr) {
-    // Build horizontal date strip (30 days: yesterday to +28)
-    const stripStart = new Date(today);
-    stripStart.setDate(stripStart.getDate() - 1);
+    // Build horizontal date strip (current Mon-Sun week, 7 pills)
+    const { start: weekMonday } = getMelbourneWeekRange();
+    const stripStart = new Date(weekMonday);
 
     let stripHtml = '<div id="date-strip-scroll" class="overflow-x-auto pb-2 mb-4" style="-webkit-overflow-scrolling:touch;scrollbar-width:none">';
     stripHtml += '<div id="date-strip" class="flex gap-2" style="min-width:max-content;padding:4px 2px">';
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 7; i++) {
         const d = new Date(stripStart);
         d.setDate(d.getDate() + i);
         const dStr = formatDateForDB(d);
@@ -95,7 +95,7 @@ function buildUpcomingView(today, todayStr) {
             stripHtml += `
                 <button id="strip-${dStr}" onclick="selectCalendarDate('${dStr}')" class="date-pill flex flex-col items-center" style="min-width:52px;padding:8px 10px;border-radius:14px;background:var(--bg-secondary);color:var(--text-primary);border:none;cursor:pointer">
                     <span style="font-size:10px;font-weight:600;color:var(--text-secondary)">${dayLabel}</span>
-                    <span style="font-size:20px;font-weight:800;line-height:1.1;${i === 0 ? 'color:var(--text-secondary)' : ''}">${d.getDate()}</span>
+                    <span style="font-size:20px;font-weight:800;line-height:1.1">${d.getDate()}</span>
                     ${dotHtml}
                 </button>`;
         }

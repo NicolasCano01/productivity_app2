@@ -240,6 +240,23 @@ function initDarkMode() {
     }
 }
 
+// Get current Mon-Sun week range in Melbourne timezone
+// Returns {start: Date (Monday 00:00:00), end: Date (Sunday 23:59:59)}
+function getMelbourneWeekRange() {
+    const today = getMelbourneDate();
+    today.setHours(0, 0, 0, 0);
+    const dow = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    // Days since Monday: Sun(0)->6, Mon(1)->0, Tue(2)->1, ..., Sat(6)->5
+    const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+    const start = new Date(today);
+    start.setDate(today.getDate() - daysSinceMonday);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+}
+
 // Escape HTML to prevent XSS
 function escapeHtml(text) {
     if (!text) return '';

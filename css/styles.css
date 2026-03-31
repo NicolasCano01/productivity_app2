@@ -319,6 +319,11 @@ body.dark .bottom-nav {
     opacity: 0.5;
 }
 
+.task-card.deleted-task {
+    opacity: 0.45;
+    border-left: 3px solid var(--danger, #FF3B30);
+}
+
 .task-checkbox {
     width: 22px;
     height: 22px;
@@ -568,13 +573,13 @@ body.dark .bottom-nav {
 /* ---- Chart containers ---- */
 .chart-container {
     position: relative;
-    height: 200px;
+    height: 280px;
     margin-bottom: 1rem;
 }
 
 .chart-container-small {
     position: relative;
-    height: 150px;
+    height: 180px;
     margin-bottom: 1rem;
 }
 

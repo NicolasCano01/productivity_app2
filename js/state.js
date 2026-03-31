@@ -10,7 +10,7 @@ let lastCheckedDate = '';
 
 // Current Panel State
 let currentPanel = 'habits';
-let currentTaskView = 'all'; // 'all', 'overdue', 'upcoming'
+let currentTaskView = 'all'; // 'all', 'overdue', 'upcoming', 'completed', 'deleted'
 
 // Habit log date — allows logging completions for past dates
 let habitLogDate = ''; // set to getMelbourneDateString() on init
