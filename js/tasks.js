@@ -803,7 +803,7 @@ async function restoreTask(taskId) {
     try {
         const { error } = await supabaseClient
             .from('tasks')
-            .update({ status: 'pending', deleted_at: null })
+            .update({ status: 'active', deleted_at: null })
             .eq('id', taskId);
 
         if (error) throw error;

@@ -19,10 +19,10 @@ let insightCharts = {};
 
 // Collapsible section states
 let sectionStates = {
-    habits: true,    // expanded by default
-    tasks: true,     // expanded by default
+    habits: false,   // collapsed by default
+    tasks: false,    // collapsed by default
     goals: false,    // collapsed by default
-    insights: true   // expanded by default
+    insights: true   // expanded by default (only this one)
 };
 
 // Initialize analytics when panel is shown
@@ -39,6 +39,11 @@ function renderAnalytics() {
     renderTaskAnalytics();
     renderGoalAnalytics();
     renderInsights();
+
+    // Load AI-generated chart for analytics (non-blocking)
+    if (typeof loadAnalyticsAIChart === 'function') {
+        setTimeout(() => loadAnalyticsAIChart(), 300);
+    }
 }
 
 // Summary cards — always-visible overview row

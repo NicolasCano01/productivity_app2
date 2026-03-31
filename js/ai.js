@@ -22,19 +22,11 @@ let aiChatHistory = [];
 // ============================================
 async function callAI(type, data = {}, messages = [], systemPrompt = '') {
     try {
-        const session = await supabaseClient.auth.getSession();
-        const token = session?.data?.session?.access_token;
-        if (!token) {
-            console.error('No auth token for AI call');
-            return null;
-        }
-
         const response = await fetch(AI_FUNCTION_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-                'apikey': SUPABASE_ANON_KEY
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
             },
             body: JSON.stringify({ type, data, messages, systemPrompt })
         });
@@ -535,6 +527,98 @@ function formatAIResponse(text) {
     return escapeHtml(text)
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
+}
+
+// ============================================
+// ANALYTICS AI CHART (inside insights section)
+// ============================================
+let analyticsAIChart = null;
+
+async function loadAnalyticsAIChart() {
+    const section = document.getElementById('analytics-ai-chart-section');
+    const textContainer = document.getElementById('analytics-ai-insights-text');
+    const ctx = document.getElementById('analytics-ai-chart');
+    if (!section || !ctx) return;
+
+    const todayStr = getMelbourneDateString();
+
+    // Use cached insights if available from same day
+    let result = aiCache.calendarInsights;
+    if (!result || aiCache.calendarInsightsDate !== todayStr) {
+        const data = gatherAIData();
+        result = await callAI('insights', data);
+        if (result) {
+            aiCache.calendarInsights = result;
+            aiCache.calendarInsightsDate = todayStr;
+        }
+    }
+
+    if (!result || !result.chart) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+
+    // Render insight text
+    if (textContainer && result.insights) {
+        textContainer.innerHTML = result.insights.map(line => `
+            <p style="font-size:12px;color:var(--text-secondary);line-height:1.4;margin-bottom:3px">${escapeHtml(line)}</p>
+        `).join('');
+    }
+
+    // Render chart
+    const chartConfig = result.chart;
+    if (analyticsAIChart) analyticsAIChart.destroy();
+
+    const dark = isDarkMode();
+    const tickColor = dark ? '#98989D' : '#6E6E73';
+    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const type = chartConfig.type || 'bar';
+
+    const config = {
+        type: type,
+        data: {
+            labels: chartConfig.labels || [],
+            datasets: [{
+                label: chartConfig.title || 'Data',
+                data: chartConfig.data || [],
+                backgroundColor: chartConfig.colors || ['#007AFF'],
+                borderColor: type === 'line' ? (chartConfig.colors?.[0] || '#007AFF') : undefined,
+                borderWidth: type === 'line' ? 3 : 0,
+                borderRadius: type === 'bar' ? 4 : undefined,
+                tension: type === 'line' ? 0.4 : undefined,
+                fill: type === 'line' ? false : undefined,
+                pointRadius: type === 'line' ? 4 : undefined,
+                pointBackgroundColor: type === 'line' ? (chartConfig.colors?.[0] || '#007AFF') : undefined
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: type === 'doughnut', position: 'bottom', labels: { color: tickColor, font: { size: 11 } } },
+                tooltip: {
+                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#E5E5EA',
+                    cornerRadius: 8,
+                    padding: 10
+                }
+            },
+            scales: type === 'doughnut' ? {} : {
+                x: { ticks: { color: tickColor, font: { size: 10 }, maxRotation: 0 }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } }
+            }
+        }
+    };
+
+    if (type === 'doughnut') {
+        config.data.datasets[0].borderWidth = 3;
+        config.data.datasets[0].borderColor = dark ? '#1C1C1E' : '#FFFFFF';
+    }
+
+    analyticsAIChart = new Chart(ctx, config);
 }
 
 function gatherFullDataForChat() {
