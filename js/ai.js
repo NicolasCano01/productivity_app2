@@ -37,7 +37,9 @@ async function callAI(type, data = {}, messages = [], systemPrompt = '') {
             return null;
         }
 
-        return await response.json();
+        const json = await response.json();
+        console.log('AI response for', type, ':', JSON.stringify(json).substring(0, 200));
+        return json;
     } catch (err) {
         console.error('AI call failed:', err);
         return null;
@@ -304,53 +306,57 @@ function renderAIPanel() {
     if (!container) return;
 
     container.innerHTML = `
-        <!-- AI Insights Section -->
-        <div id="ai-panel-insights" class="mb-4">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="fas fa-chart-line" style="color:var(--accent)"></i>
-                <span class="font-bold" style="color:var(--text-primary)">Insights</span>
-            </div>
-            <div id="ai-insights-cards" class="space-y-3">
-                <div class="flex items-center gap-2 p-4 rounded-xl" style="background:var(--bg-secondary)">
-                    <div class="spinner" style="width:16px;height:16px;border-width:2px"></div>
-                    <span style="font-size:13px;color:var(--text-secondary)">Loading insights...</span>
+        <div style="display:flex;flex-direction:column;height:calc(100vh - 180px)">
+            <!-- AI Insights Section (collapsible) -->
+            <div id="ai-panel-insights" class="mb-3" style="flex-shrink:0">
+                <div class="flex items-center gap-2 mb-2 cursor-pointer" onclick="toggleAIInsights()">
+                    <i class="fas fa-chart-line" style="color:var(--accent)"></i>
+                    <span class="font-bold text-sm" style="color:var(--text-primary)">Insights</span>
+                    <i id="ai-insights-chevron" class="fas fa-chevron-up text-xs" style="color:var(--text-secondary);margin-left:auto"></i>
                 </div>
-            </div>
-        </div>
-
-        <!-- AI Chart Section -->
-        <div id="ai-chart-section" class="mb-4" style="display:none">
-            <div class="rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                <h4 id="ai-chart-title" class="text-sm font-semibold mb-2" style="color:var(--text-primary)"></h4>
-                <div style="position:relative;height:200px">
-                    <canvas id="ai-dynamic-chart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- AI Chat Section -->
-        <div class="rounded-xl overflow-hidden" style="border:1px solid var(--border)">
-            <div class="flex items-center gap-2 p-3" style="background:var(--bg-secondary);border-bottom:1px solid var(--border)">
-                <i class="fas fa-robot" style="color:var(--accent)"></i>
-                <span class="font-bold text-sm" style="color:var(--text-primary)">Ask AI</span>
-                <span style="font-size:11px;color:var(--text-secondary);margin-left:auto">Powered by Gemini</span>
-            </div>
-            <div id="ai-chat-messages" class="p-3 space-y-3" style="max-height:300px;overflow-y:auto;background:var(--bg-primary)">
-                <div class="flex items-start gap-2">
-                    <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
-                    <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
-                        Hi! I have access to your productivity data. Ask me anything — e.g., "When did I last complete a goal?" or "How many times have I done habit X?"
+                <div id="ai-insights-body">
+                    <div id="ai-insights-cards" class="space-y-2">
+                        <div class="flex items-center gap-2 p-3 rounded-xl" style="background:var(--bg-secondary)">
+                            <div class="spinner" style="width:16px;height:16px;border-width:2px"></div>
+                            <span style="font-size:13px;color:var(--text-secondary)">Loading insights...</span>
+                        </div>
+                    </div>
+                    <!-- AI Chart Section -->
+                    <div id="ai-chart-section" class="mt-2" style="display:none">
+                        <div class="rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
+                            <h4 id="ai-chart-title" class="text-sm font-semibold mb-2" style="color:var(--text-primary)"></h4>
+                            <div style="position:relative;height:180px">
+                                <canvas id="ai-dynamic-chart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="flex gap-2 p-3" style="border-top:1px solid var(--border);background:var(--bg-secondary)">
-                <input id="ai-chat-input" type="text" placeholder="Ask about your productivity..."
-                    class="flex-1 px-3 py-2 rounded-lg text-sm"
-                    style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);outline:none"
-                    onkeydown="if(event.key==='Enter')sendAIChat()">
-                <button onclick="sendAIChat()" class="px-3 py-2 rounded-lg" style="background:var(--accent);color:white;border:none;cursor:pointer">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
+
+            <!-- AI Chat Section (fills remaining space) -->
+            <div class="rounded-xl overflow-hidden flex flex-col" style="border:1px solid var(--border);flex:1;min-height:0">
+                <div class="flex items-center gap-2 p-3" style="background:var(--bg-secondary);border-bottom:1px solid var(--border);flex-shrink:0">
+                    <i class="fas fa-robot" style="color:var(--accent)"></i>
+                    <span class="font-bold text-sm" style="color:var(--text-primary)">Ask AI</span>
+                    <span style="font-size:11px;color:var(--text-secondary);margin-left:auto">Powered by Gemini</span>
+                </div>
+                <div id="ai-chat-messages" class="p-3 space-y-3" style="flex:1;overflow-y:auto;background:var(--bg-primary)">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
+                        <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
+                            Hi! I have access to your productivity data. Ask me anything — e.g., "When did I last complete a goal?" or "How many times have I done habit X?"
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2 p-3" style="border-top:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0">
+                    <input id="ai-chat-input" type="text" placeholder="Ask about your productivity..."
+                        class="flex-1 px-3 py-2 rounded-lg text-sm"
+                        style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);outline:none"
+                        onkeydown="if(event.key==='Enter')sendAIChat()">
+                    <button onclick="sendAIChat()" class="px-3 py-2 rounded-lg" style="background:var(--accent);color:white;border:none;cursor:pointer">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -520,6 +526,14 @@ async function sendAIChat() {
         </div>
     `;
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function toggleAIInsights() {
+    const body = document.getElementById('ai-insights-body');
+    const chevron = document.getElementById('ai-insights-chevron');
+    if (!body) return;
+    const isHidden = body.classList.toggle('hidden');
+    if (chevron) chevron.className = `fas fa-chevron-${isHidden ? 'down' : 'up'} text-xs`;
 }
 
 function formatAIResponse(text) {

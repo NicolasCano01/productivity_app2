@@ -801,12 +801,21 @@ async function restoreTask(taskId) {
     showToast('Task restored!', 'success');
 
     try {
-        const { error } = await supabaseClient
+        // Use RPC or raw update — set status and clear deleted_at separately
+        // to avoid potential constraint issues with null handling
+        const { error: statusError } = await supabaseClient
             .from('tasks')
-            .update({ status: 'active', deleted_at: null })
+            .update({ status: 'active' })
             .eq('id', taskId);
 
-        if (error) throw error;
+        if (statusError) throw statusError;
+
+        const { error: clearError } = await supabaseClient
+            .from('tasks')
+            .update({ deleted_at: null })
+            .eq('id', taskId);
+
+        if (clearError) throw clearError;
 
         // Refetch the restored task to get correct server state
         const { data: updatedTask, error: fetchError } = await supabaseClient

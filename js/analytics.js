@@ -1472,6 +1472,10 @@ function renderInsights() {
     
     setTimeout(() => {
         createBestDayChart();
+        // Load AI-generated chart in analytics insights section
+        if (typeof loadAnalyticsAIChart === 'function') {
+            loadAnalyticsAIChart();
+        }
     }, 100);
 }
 
