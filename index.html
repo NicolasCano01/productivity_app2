@@ -190,7 +190,17 @@
                 <div id="calendar-view"></div>
             </div>
 
-            <!-- PANEL 5: ANALYTICS -->
+            <!-- PANEL 5: AI -->
+            <div id="ai-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-sparkles" style="color:var(--accent);margin-right:6px"></i>AI Assistant
+                    </h2>
+                </div>
+                <div id="ai-panel-content"></div>
+            </div>
+
+            <!-- PANEL 6: ANALYTICS -->
             <div id="analytics-panel" class="panel hidden p-4">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-2xl font-bold text-gray-800">Analytics</h2>
@@ -284,7 +294,7 @@
         <!-- Bottom Navigation -->    
         <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-around" style="z-index: 9999; padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
             <div class="flex justify-around items-center">
-                <button class="nav-btn active" data-panel="habits" onclick="switchPanel('habits')">
+                <button class="nav-btn" data-panel="habits" onclick="switchPanel('habits')">
                     <i class="fas fa-list-check"></i>
                     <span>Habits</span>
                 </button>
@@ -296,9 +306,13 @@
                     <i class="fas fa-bullseye"></i>
                     <span>Goals</span>
                 </button>
-                <button class="nav-btn" data-panel="calendar" onclick="switchPanel('calendar')">
+                <button class="nav-btn active" data-panel="calendar" onclick="switchPanel('calendar')">
                     <i class="fas fa-calendar"></i>
                     <span>Calendar</span>
+                </button>
+                <button class="nav-btn" data-panel="ai" onclick="switchPanel('ai')">
+                    <i class="fas fa-sparkles"></i>
+                    <span>AI</span>
                 </button>
                 <button class="nav-btn" data-panel="analytics" onclick="switchPanel('analytics')">
                     <i class="fas fa-chart-line"></i>
@@ -649,6 +663,7 @@ REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
     <script src="js/categories.js"></script>
     <script src="js/calendar.js"></script>
     <script src="js/analytics.js"></script>
+    <script src="js/ai.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

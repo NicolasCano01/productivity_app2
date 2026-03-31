@@ -24,6 +24,11 @@ function renderCalendar() {
     calendarView.innerHTML = buildCalendarHTML();
     // After rendering, scroll the date strip to today
     scrollDateStripToSelected();
+
+    // Load AI insights asynchronously (non-blocking)
+    if (calendarViewMode === 'upcoming' && typeof loadCalendarInsights === 'function') {
+        setTimeout(() => loadCalendarInsights(), 200);
+    }
 }
 
 function buildCalendarHTML() {
@@ -102,10 +107,13 @@ function buildUpcomingView(today, todayStr) {
     }
     stripHtml += '</div></div>';
 
+    // AI Insights placeholder (loaded async after render)
+    const aiInsightsHtml = '<div id="calendar-ai-insights"></div>';
+
     // Task list — grouped by date section, all upcoming tasks
     const taskListHtml = buildUpcomingTaskList(today, todayStr);
 
-    return stripHtml + taskListHtml;
+    return stripHtml + aiInsightsHtml + taskListHtml;
 }
 
 function buildUpcomingTaskList(today, todayStr) {

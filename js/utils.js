@@ -65,6 +65,8 @@ function switchPanel(panelName) {
         renderAnalytics();
     } else if (panelName === 'calendar') {
         renderCalendar();
+    } else if (panelName === 'ai') {
+        if (typeof renderAIPanel === 'function') renderAIPanel();
     }
     
     console.log(`Switched to ${panelName} panel`);
@@ -154,8 +156,8 @@ function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
     loadingScreen.style.display = 'none';
     
-    // Show the first panel (habits)
-    switchPanel('habits');
+    // Show the first panel (calendar)
+    switchPanel('calendar');
     
     // Update current date display
     updateCurrentDate();

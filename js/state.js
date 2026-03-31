@@ -9,7 +9,7 @@ let supabaseClient = null;
 let lastCheckedDate = '';
 
 // Current Panel State
-let currentPanel = 'habits';
+let currentPanel = 'calendar';
 let currentTaskView = 'all'; // 'all', 'overdue', 'upcoming', 'completed', 'deleted'
 
 // Habit log date — allows logging completions for past dates
