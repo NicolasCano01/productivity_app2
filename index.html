@@ -190,17 +190,7 @@
                 <div id="calendar-view"></div>
             </div>
 
-            <!-- PANEL 5: AI -->
-            <div id="ai-panel" class="panel hidden p-4">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">
-                        <i class="fas fa-sparkles" style="color:var(--accent);margin-right:6px"></i>AI Assistant
-                    </h2>
-                </div>
-                <div id="ai-panel-content"></div>
-            </div>
-
-            <!-- PANEL 6: ANALYTICS -->
+            <!-- PANEL 5: ANALYTICS -->
             <div id="analytics-panel" class="panel hidden p-4">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-2xl font-bold text-gray-800">Analytics</h2>
@@ -323,16 +313,52 @@
                     <i class="fas fa-calendar"></i>
                     <span>Calendar</span>
                 </button>
-                <button class="nav-btn" data-panel="ai" onclick="switchPanel('ai')">
-                    <i class="fas fa-sparkles"></i>
-                    <span>AI</span>
-                </button>
                 <button class="nav-btn" data-panel="analytics" onclick="switchPanel('analytics')">
                     <i class="fas fa-chart-line"></i>
                     <span>Analytics</span>
                 </button>
             </div>
         </nav>
+
+        <!-- AI Chat FAB (floating action button) — visible on Calendar & Analytics -->
+        <button id="ai-chat-fab" class="ai-chat-fab hidden" onclick="openAIChatPopup()">
+            <i class="fas fa-sparkles"></i>
+        </button>
+
+        <!-- AI Chat Popup Overlay -->
+        <div id="ai-chat-overlay" class="ai-chat-overlay hidden" onclick="closeAIChatPopup(event)">
+            <div class="ai-chat-popup" onclick="event.stopPropagation()">
+                <div class="ai-chat-popup-header">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-robot" style="color:var(--accent)"></i>
+                        <span class="font-bold text-sm" style="color:var(--text-primary)">AI Assistant</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span style="font-size:10px;color:var(--text-secondary)">Powered by Gemini</span>
+                        <button onclick="closeAIChatPopup()" style="background:none;border:none;cursor:pointer;padding:4px">
+                            <i class="fas fa-times" style="color:var(--text-secondary);font-size:16px"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="ai-chat-messages" class="ai-chat-popup-messages">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
+                        <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
+                            Hi! I have access to your productivity data. Ask me anything — e.g., "When did I last complete a goal?" or "How many times have I done habit X?"
+                        </div>
+                    </div>
+                </div>
+                <div class="ai-chat-popup-input">
+                    <input id="ai-chat-input" type="text" placeholder="Ask about your productivity..."
+                        class="flex-1 px-3 py-2 rounded-lg text-sm"
+                        style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);outline:none"
+                        onkeydown="if(event.key==='Enter')sendAIChat()">
+                    <button onclick="sendAIChat()" class="px-3 py-2 rounded-lg" style="background:var(--accent);color:white;border:none;cursor:pointer">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <!-- Habit Modal -->

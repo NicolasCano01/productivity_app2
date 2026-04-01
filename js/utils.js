@@ -65,8 +65,16 @@ function switchPanel(panelName) {
         renderAnalytics();
     } else if (panelName === 'calendar') {
         renderCalendar();
-    } else if (panelName === 'ai') {
-        if (typeof renderAIPanel === 'function') renderAIPanel();
+    }
+
+    // Show/hide AI chat FAB on Calendar & Analytics panels only
+    const fab = document.getElementById('ai-chat-fab');
+    if (fab) {
+        if (panelName === 'calendar' || panelName === 'analytics') {
+            fab.classList.remove('hidden');
+        } else {
+            fab.classList.add('hidden');
+        }
     }
     
     console.log(`Switched to ${panelName} panel`);

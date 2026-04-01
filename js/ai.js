@@ -326,139 +326,28 @@ function renderCalendarInsights(container, insights, quote) {
 }
 
 // ============================================
-// AI PANEL — Full insights + Chat
+// AI CHAT POPUP — opens over Calendar / Analytics
 // ============================================
-function renderAIPanel() {
-    const container = document.getElementById('ai-panel-content');
-    if (!container) return;
-
-    container.innerHTML = `
-        <div style="display:flex;flex-direction:column;height:calc(100vh - 180px)">
-            <!-- AI Chat Section (full height) -->
-            <div class="rounded-xl overflow-hidden flex flex-col" style="border:1px solid var(--border);flex:1;min-height:0">
-                <div class="flex items-center gap-2 p-3" style="background:var(--bg-secondary);border-bottom:1px solid var(--border);flex-shrink:0">
-                    <i class="fas fa-robot" style="color:var(--accent)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text-primary)">Ask AI</span>
-                    <span style="font-size:11px;color:var(--text-secondary);margin-left:auto">Powered by Gemini</span>
-                </div>
-                <div id="ai-chat-messages" class="p-3 space-y-3" style="flex:1;overflow-y:auto;background:var(--bg-primary)">
-                    <div class="flex items-start gap-2">
-                        <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
-                        <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
-                            Hi! I have access to your productivity data. Ask me anything — e.g., "When did I last complete a goal?" or "How many times have I done habit X?"
-                        </div>
-                    </div>
-                </div>
-                <div class="flex gap-2 p-3" style="border-top:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0">
-                    <input id="ai-chat-input" type="text" placeholder="Ask about your productivity..."
-                        class="flex-1 px-3 py-2 rounded-lg text-sm"
-                        style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);outline:none"
-                        onkeydown="if(event.key==='Enter')sendAIChat()">
-                    <button onclick="sendAIChat()" class="px-3 py-2 rounded-lg" style="background:var(--accent);color:white;border:none;cursor:pointer">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-let aiDynamicChart = null;
-
-async function loadAIPanelInsights() {
-    const data = gatherAIData();
-    const result = await callAI('insights', data);
-
-    const cardsContainer = document.getElementById('ai-insights-cards');
-    if (!cardsContainer) return;
-
-    if (!result || !result.insights) {
-        cardsContainer.innerHTML = `
-            <div class="p-3 rounded-xl" style="background:var(--bg-secondary)">
-                <p style="font-size:13px;color:var(--text-secondary)">Could not load insights. Make sure GEMINI_API_KEY is set in Supabase secrets.</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Render insight cards
-    const insights = result.insights || [];
-    cardsContainer.innerHTML = insights.map((insight, i) => `
-        <div class="rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-            <div class="flex items-start gap-2">
-                <i class="fas fa-${i === 0 ? 'lightbulb' : 'chart-bar'} mt-0.5" style="color:${i === 0 ? 'var(--warning)' : 'var(--accent)'};font-size:14px"></i>
-                <p style="font-size:13px;color:var(--text-primary);line-height:1.4">${escapeHtml(insight)}</p>
-            </div>
-        </div>
-    `).join('');
-
-    // Render AI chart if provided
-    if (result.chart) {
-        renderAIDynamicChart(result.chart);
+function openAIChatPopup() {
+    const overlay = document.getElementById('ai-chat-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        // Focus the input
+        setTimeout(() => {
+            const input = document.getElementById('ai-chat-input');
+            if (input) input.focus();
+        }, 100);
     }
 }
 
-function renderAIDynamicChart(chartConfig) {
-    const section = document.getElementById('ai-chart-section');
-    const titleEl = document.getElementById('ai-chart-title');
-    const ctx = document.getElementById('ai-dynamic-chart');
-    if (!section || !ctx) return;
-
-    section.style.display = 'block';
-    if (titleEl) titleEl.textContent = chartConfig.title || 'AI Analysis';
-
-    if (aiDynamicChart) aiDynamicChart.destroy();
-
-    const dark = isDarkMode();
-    const tickColor = dark ? '#98989D' : '#6E6E73';
-    const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-    const type = chartConfig.type || 'bar';
-
-    const config = {
-        type: type,
-        data: {
-            labels: chartConfig.labels || [],
-            datasets: [{
-                label: chartConfig.title || 'Data',
-                data: chartConfig.data || [],
-                backgroundColor: chartConfig.colors || ['#007AFF'],
-                borderColor: type === 'line' ? (chartConfig.colors?.[0] || '#007AFF') : undefined,
-                borderWidth: type === 'line' ? 3 : 0,
-                borderRadius: type === 'bar' ? 4 : undefined,
-                tension: type === 'line' ? 0.4 : undefined,
-                fill: type === 'line' ? false : undefined,
-                pointRadius: type === 'line' ? 4 : undefined,
-                pointBackgroundColor: type === 'line' ? (chartConfig.colors?.[0] || '#007AFF') : undefined
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: type === 'doughnut', position: 'bottom', labels: { color: tickColor, font: { size: 11 } } },
-                tooltip: {
-                    backgroundColor: dark ? '#2C2C2E' : 'rgba(0,0,0,0.85)',
-                    titleColor: '#FFFFFF',
-                    bodyColor: '#E5E5EA',
-                    cornerRadius: 8,
-                    padding: 10
-                }
-            },
-            scales: type === 'doughnut' ? {} : {
-                x: { ticks: { color: tickColor, font: { size: 10 }, maxRotation: 0 }, grid: { display: false } },
-                y: { beginAtZero: true, ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } }
-            }
-        }
-    };
-
-    // Handle doughnut border for dark mode
-    if (type === 'doughnut') {
-        config.data.datasets[0].borderWidth = 3;
-        config.data.datasets[0].borderColor = dark ? '#1C1C1E' : '#FFFFFF';
-    }
-
-    aiDynamicChart = new Chart(ctx, config);
+function closeAIChatPopup(event) {
+    // If called from overlay click, only close if clicking the backdrop itself
+    if (event && event.target !== event.currentTarget) return;
+    const overlay = document.getElementById('ai-chat-overlay');
+    if (overlay) overlay.classList.add('hidden');
 }
+
+// (Old AI panel functions removed — chat is now a popup overlay)
 
 // ============================================
 // AI CHAT
@@ -524,14 +413,6 @@ async function sendAIChat() {
         </div>
     `;
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function toggleAIInsights() {
-    const body = document.getElementById('ai-insights-body');
-    const chevron = document.getElementById('ai-insights-chevron');
-    if (!body) return;
-    const isHidden = body.classList.toggle('hidden');
-    if (chevron) chevron.className = `fas fa-chevron-${isHidden ? 'down' : 'up'} text-xs`;
 }
 
 function formatAIResponse(text) {
