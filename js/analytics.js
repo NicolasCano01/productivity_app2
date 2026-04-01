@@ -39,11 +39,6 @@ function renderAnalytics() {
     renderTaskAnalytics();
     renderGoalAnalytics();
     renderInsights();
-
-    // Load AI-generated chart for analytics (non-blocking)
-    if (typeof loadAnalyticsAIChart === 'function') {
-        setTimeout(() => loadAnalyticsAIChart(), 300);
-    }
 }
 
 // Summary cards — always-visible overview row

@@ -5,14 +5,40 @@
 const AI_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
 
 // Cache for daily quote and insights (avoid repeated API calls)
-let aiCache = {
-    dailyQuote: null,
-    dailyQuoteDate: null,
-    calendarInsights: null,
-    calendarInsightsDate: null,
-    panelInsights: null,
-    panelInsightsDate: null
-};
+// Persisted to localStorage so data survives page reloads within the same day
+let aiCache = loadAICacheFromStorage();
+
+function loadAICacheFromStorage() {
+    try {
+        const stored = localStorage.getItem('aiCache');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+            // Only use cache if it's from today
+            if (parsed.calendarInsightsDate === todayStr || parsed.dailyQuoteDate === todayStr) {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load AI cache from localStorage:', e);
+    }
+    return {
+        dailyQuote: null,
+        dailyQuoteDate: null,
+        calendarInsights: null,
+        calendarInsightsDate: null,
+        panelInsights: null,
+        panelInsightsDate: null
+    };
+}
+
+function saveAICacheToStorage() {
+    try {
+        localStorage.setItem('aiCache', JSON.stringify(aiCache));
+    } catch (e) {
+        console.warn('Failed to save AI cache to localStorage:', e);
+    }
+}
 
 // Chat history for AI panel
 let aiChatHistory = [];
@@ -233,7 +259,7 @@ async function loadCalendarInsights() {
             : callAI('quote', { dayOfWeek: data.dayOfWeek, context: `${data.tasks.completedThisWeek} tasks done this week, ${data.tasks.overdue.length} overdue` })
     ]);
 
-    // Cache results
+    // Cache results and persist to localStorage
     if (insightsResult) {
         aiCache.calendarInsights = insightsResult;
         aiCache.calendarInsightsDate = todayStr;
@@ -242,6 +268,7 @@ async function loadCalendarInsights() {
         aiCache.dailyQuote = quoteResult;
         aiCache.dailyQuoteDate = todayStr;
     }
+    saveAICacheToStorage();
 
     renderCalendarInsights(container, insightsResult, quoteResult);
 }
@@ -253,22 +280,7 @@ function renderCalendarInsights(container, insights, quote) {
 
     let html = '';
 
-    // AI Insights
-    if (insightLines.length > 0) {
-        html += `
-            <div class="rounded-xl p-3 mb-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-sparkles" style="color:var(--accent)"></i>
-                    <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">AI INSIGHTS</span>
-                </div>
-                ${insightLines.map(line => `
-                    <p style="font-size:13px;color:var(--text-primary);margin-bottom:4px;line-height:1.4">${escapeHtml(line)}</p>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    // Daily Quote
+    // Daily Quote FIRST
     if (quoteText) {
         html += `
             <div class="rounded-xl p-3 mb-3" style="background:linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));border:1px solid var(--border)">
@@ -279,6 +291,21 @@ function renderCalendarInsights(container, insights, quote) {
                         ${quoteAuthor ? `<p style="font-size:11px;color:var(--text-secondary);font-weight:600">— ${escapeHtml(quoteAuthor)}</p>` : ''}
                     </div>
                 </div>
+            </div>
+        `;
+    }
+
+    // AI Text Insights BELOW the quote
+    if (insightLines.length > 0) {
+        html += `
+            <div class="rounded-xl p-3 mb-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fas fa-sparkles" style="color:var(--accent)"></i>
+                    <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">AI INSIGHTS</span>
+                </div>
+                ${insightLines.map(line => `
+                    <p style="font-size:13px;color:var(--text-primary);margin-bottom:4px;line-height:1.4">${escapeHtml(line)}</p>
+                `).join('')}
             </div>
         `;
     }
@@ -307,33 +334,7 @@ function renderAIPanel() {
 
     container.innerHTML = `
         <div style="display:flex;flex-direction:column;height:calc(100vh - 180px)">
-            <!-- AI Insights Section (collapsible) -->
-            <div id="ai-panel-insights" class="mb-3" style="flex-shrink:0">
-                <div class="flex items-center gap-2 mb-2 cursor-pointer" onclick="toggleAIInsights()">
-                    <i class="fas fa-chart-line" style="color:var(--accent)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text-primary)">Insights</span>
-                    <i id="ai-insights-chevron" class="fas fa-chevron-up text-xs" style="color:var(--text-secondary);margin-left:auto"></i>
-                </div>
-                <div id="ai-insights-body">
-                    <div id="ai-insights-cards" class="space-y-2">
-                        <div class="flex items-center gap-2 p-3 rounded-xl" style="background:var(--bg-secondary)">
-                            <div class="spinner" style="width:16px;height:16px;border-width:2px"></div>
-                            <span style="font-size:13px;color:var(--text-secondary)">Loading insights...</span>
-                        </div>
-                    </div>
-                    <!-- AI Chart Section -->
-                    <div id="ai-chart-section" class="mt-2" style="display:none">
-                        <div class="rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                            <h4 id="ai-chart-title" class="text-sm font-semibold mb-2" style="color:var(--text-primary)"></h4>
-                            <div style="position:relative;height:180px">
-                                <canvas id="ai-dynamic-chart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Chat Section (fills remaining space) -->
+            <!-- AI Chat Section (full height) -->
             <div class="rounded-xl overflow-hidden flex flex-col" style="border:1px solid var(--border);flex:1;min-height:0">
                 <div class="flex items-center gap-2 p-3" style="background:var(--bg-secondary);border-bottom:1px solid var(--border);flex-shrink:0">
                     <i class="fas fa-robot" style="color:var(--accent)"></i>
@@ -360,9 +361,6 @@ function renderAIPanel() {
             </div>
         </div>
     `;
-
-    // Load insights
-    loadAIPanelInsights();
 }
 
 let aiDynamicChart = null;
@@ -564,6 +562,7 @@ async function loadAnalyticsAIChart() {
         if (result) {
             aiCache.calendarInsights = result;
             aiCache.calendarInsightsDate = todayStr;
+            saveAICacheToStorage();
         }
     }
 
@@ -574,10 +573,17 @@ async function loadAnalyticsAIChart() {
 
     section.style.display = 'block';
 
-    // Render insight text
+    // Render insight text as compact cards (max 2)
     if (textContainer && result.insights) {
-        textContainer.innerHTML = result.insights.map(line => `
-            <p style="font-size:12px;color:var(--text-secondary);line-height:1.4;margin-bottom:3px">${escapeHtml(line)}</p>
+        const icons = ['lightbulb', 'chart-bar', 'bolt', 'bullseye', 'fire'];
+        const colors = ['var(--warning)', 'var(--accent)', '#FF9500', '#34C759', '#FF3B30'];
+        textContainer.innerHTML = result.insights.slice(0, 2).map((insight, i) => `
+            <div class="rounded-lg p-2.5 mb-2" style="background:var(--bg-tertiary);border:1px solid var(--border)">
+                <div class="flex items-start gap-2">
+                    <i class="fas fa-${icons[i % icons.length]} mt-0.5" style="color:${colors[i % colors.length]};font-size:13px;flex-shrink:0"></i>
+                    <p style="font-size:12px;color:var(--text-primary);line-height:1.4">${escapeHtml(insight)}</p>
+                </div>
+            </div>
         `).join('');
     }
 
