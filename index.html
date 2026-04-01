@@ -322,40 +322,49 @@
 
         <!-- AI Chat FAB (floating action button) — visible on Calendar & Analytics -->
         <button id="ai-chat-fab" class="ai-chat-fab hidden" onclick="openAIChatPopup()">
-            <i class="fas fa-sparkles"></i>
+            <i class="fas fa-sparkles" style="font-size:14px"></i>
+            <span>AI</span>
         </button>
 
         <!-- AI Chat Popup Overlay -->
         <div id="ai-chat-overlay" class="ai-chat-overlay hidden" onclick="closeAIChatPopup(event)">
             <div class="ai-chat-popup" onclick="event.stopPropagation()">
+                <!-- Header -->
                 <div class="ai-chat-popup-header">
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-robot" style="color:var(--accent)"></i>
-                        <span class="font-bold text-sm" style="color:var(--text-primary)">AI Assistant</span>
+                    <button onclick="closeAIChatPopup()" class="ai-chat-close-btn">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div style="text-align:center;flex:1">
+                        <div style="font-size:15px;font-weight:700;color:var(--text-primary)">AI Assistant</div>
+                        <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Powered by Gemini</div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <span style="font-size:10px;color:var(--text-secondary)">Powered by Gemini</span>
-                        <button onclick="closeAIChatPopup()" style="background:none;border:none;cursor:pointer;padding:4px">
-                            <i class="fas fa-times" style="color:var(--text-secondary);font-size:16px"></i>
-                        </button>
-                    </div>
+                    <button onclick="clearAIChat()" class="ai-chat-clear-btn" title="Clear chat">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>
+
+                <!-- Messages -->
                 <div id="ai-chat-messages" class="ai-chat-popup-messages">
-                    <div class="flex items-start gap-2">
-                        <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
-                        <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
-                            Hi! I have access to your productivity data. Ask me anything — e.g., "When did I last complete a goal?" or "How many times have I done habit X?"
+                    <div class="ai-chat-welcome">
+                        <div class="ai-chat-welcome-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Hi there!</div>
+                        <div style="font-size:13px;color:var(--text-secondary);line-height:1.5;max-width:280px">
+                            I have access to your productivity data. Ask me anything about your habits, tasks, or goals.
                         </div>
                     </div>
                 </div>
+
+                <!-- Input -->
                 <div class="ai-chat-popup-input">
-                    <input id="ai-chat-input" type="text" placeholder="Ask about your productivity..."
-                        class="flex-1 px-3 py-2 rounded-lg text-sm"
-                        style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);outline:none"
-                        onkeydown="if(event.key==='Enter')sendAIChat()">
-                    <button onclick="sendAIChat()" class="px-3 py-2 rounded-lg" style="background:var(--accent);color:white;border:none;cursor:pointer">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+                    <div class="ai-chat-input-wrapper">
+                        <input id="ai-chat-input" type="text" placeholder="Ask anything..."
+                            onkeydown="if(event.key==='Enter')sendAIChat()">
+                        <button onclick="sendAIChat()" class="ai-chat-send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

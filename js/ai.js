@@ -347,6 +347,24 @@ function closeAIChatPopup(event) {
     if (overlay) overlay.classList.add('hidden');
 }
 
+function clearAIChat() {
+    aiChatHistory = [];
+    const messagesContainer = document.getElementById('ai-chat-messages');
+    if (messagesContainer) {
+        messagesContainer.innerHTML = `
+            <div class="ai-chat-welcome">
+                <div class="ai-chat-welcome-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Hi there!</div>
+                <div style="font-size:13px;color:var(--text-secondary);line-height:1.5;max-width:280px">
+                    I have access to your productivity data. Ask me anything about your habits, tasks, or goals.
+                </div>
+            </div>
+        `;
+    }
+}
+
 // (Old AI panel functions removed — chat is now a popup overlay)
 
 // ============================================
@@ -362,24 +380,26 @@ async function sendAIChat() {
 
     input.value = '';
 
+    // Remove welcome message if present
+    const welcome = messagesContainer.querySelector('.ai-chat-welcome');
+    if (welcome) welcome.remove();
+
     // Add user message to UI
     messagesContainer.innerHTML += `
-        <div class="flex items-start gap-2 justify-end">
-            <div class="rounded-lg p-2.5" style="background:var(--accent);color:white;font-size:13px;line-height:1.4;max-width:85%">
-                ${escapeHtml(userMessage)}
-            </div>
+        <div class="ai-chat-bubble-user">
+            <div>${escapeHtml(userMessage)}</div>
         </div>
     `;
 
     // Add loading indicator
     const loadingId = 'ai-loading-' + Date.now();
     messagesContainer.innerHTML += `
-        <div id="${loadingId}" class="flex items-start gap-2">
-            <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
-            <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-secondary)">
+        <div id="${loadingId}" class="ai-chat-bubble-ai">
+            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-robot"></i></div>
+            <div class="ai-chat-bubble-content">
                 <div class="flex items-center gap-2">
                     <div class="spinner" style="width:14px;height:14px;border-width:2px"></div>
-                    Thinking...
+                    <span style="font-size:13px">Thinking...</span>
                 </div>
             </div>
         </div>
@@ -405,11 +425,9 @@ async function sendAIChat() {
 
     // Add AI response to UI
     messagesContainer.innerHTML += `
-        <div class="flex items-start gap-2">
-            <i class="fas fa-robot text-sm mt-1" style="color:var(--accent)"></i>
-            <div class="rounded-lg p-2.5" style="background:var(--bg-secondary);font-size:13px;color:var(--text-primary);line-height:1.4;max-width:85%">
-                ${formatAIResponse(aiResponse)}
-            </div>
+        <div class="ai-chat-bubble-ai">
+            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-robot"></i></div>
+            <div class="ai-chat-bubble-content">${formatAIResponse(aiResponse)}</div>
         </div>
     `;
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
