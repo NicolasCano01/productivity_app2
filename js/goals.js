@@ -46,18 +46,78 @@ async function renderGoals() {
     }
     
     goalsList.innerHTML = activeGoals.map(goal => {
-        // Get category color directly
         const category = appState.categories.find(c => c.id === goal.category_id);
-        const goalColor = category ? category.color_hex : '#6B7280';
+        const dotColor  = category ? category.color_hex : '#6B7280';
         const categoryName = category ? category.name : 'Uncategorized';
-        
+
         const taskCounts = getGoalTaskCounts(goal.id);
-        const progress = calculateGoalProgress(goal.id);
-        const dueDate = formatGoalDueDate(goal.due_date);
+        const progress   = calculateGoalProgress(goal.id);
+        const dueDate    = formatGoalDueDate(goal.due_date);
         const hasDeadline = goal.due_date !== null;
         const emoji = goal.emoji || '';
-        
-        return '<div class="goal-card bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" data-goal-id="' + goal.id + '" draggable="true" ondragstart="handleGoalDragStart(event, \'' + goal.id + '\')" ondragover="handleGoalDragOver(event)" ondrop="handleGoalDrop(event, \'' + goal.id + '\')" ondragend="handleGoalDragEnd(event)" onclick="openGoalModal(\'' + goal.id + '\')"><div style="height: 3px; background-color: ' + goalColor + ';"></div><div class="p-2"><div class="flex items-start justify-between gap-2 mb-1"><div class="flex-1 min-w-0"><div class="flex items-center gap-1 mb-0.5">' + (emoji ? '<span class="text-lg">' + emoji + '</span>' : '') + ' <h3 class="font-semibold text-primary text-sm leading-tight">' + escapeHtml(goal.name) + '</h3><span class="text-xs px-1.5 py-0.5 rounded" style="background-color: ' + goalColor + '20; color: ' + goalColor + ';">' + categoryName + '</span></div>' + (goal.description ? '<p class="text-xs text-gray-500 line-clamp-1">' + escapeHtml(goal.description) + '</p>' : '') + '</div></div><div class="mb-1"><div class="flex items-center justify-between mb-0.5"><span class="text-xs text-gray-500">Progress</span><span class="text-xs font-bold" style="color: ' + goalColor + ';">' + progress + '%</span></div><div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div class="h-full rounded-full transition-all duration-300" style="width: ' + progress + '%; background-color: ' + goalColor + ';"></div></div></div><div class="flex items-center justify-between text-xs"><div class="flex items-center gap-2">' + (taskCounts.total > 0 ? '<span class="flex items-center gap-1 text-gray-500"><i class="fas fa-tasks text-xs"></i><span>' + taskCounts.completed + '/' + taskCounts.total + '</span></span>' : '<span class="text-gray-400">No tasks</span>') + '</div><div class="flex items-center gap-2">' + (hasDeadline ? '<span class="flex items-center gap-1 ' + (dueDate.isOverdue ? 'text-danger font-semibold' : 'text-gray-500') + '"><i class="fas fa-clock text-xs"></i><span>' + dueDate.text + '</span></span>' : '<span class="flex items-center gap-1 text-gray-400"><i class="fas fa-infinity text-xs"></i></span>') + (progress >= 100 ? '<button onclick="event.stopPropagation(); markGoalComplete(\'' + goal.id + '\');" class="text-success hover:text-green-700 ml-1" title="Mark as complete"><i class="fas fa-check-circle"></i></button>' : '') + '</div></div></div></div>';
+
+        // Progress bar color: green when done, accent otherwise
+        const barColor = progress >= 100 ? 'var(--success)' : 'var(--accent)';
+
+        return `
+        <div class="goal-card rounded-xl cursor-pointer transition-shadow"
+             style="background:var(--bg-secondary);border:1px solid var(--border)"
+             data-goal-id="${goal.id}"
+             draggable="true"
+             ondragstart="handleGoalDragStart(event,'${goal.id}')"
+             ondragover="handleGoalDragOver(event)"
+             ondrop="handleGoalDrop(event,'${goal.id}')"
+             ondragend="handleGoalDragEnd(event)"
+             onclick="openGoalModal('${goal.id}')">
+
+            <div class="p-3">
+                <!-- Title row -->
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            ${emoji ? `<span style="font-size:16px;line-height:1">${emoji}</span>` : ''}
+                            <h3 class="font-semibold text-sm leading-tight" style="color:var(--text-primary)">${escapeHtml(goal.name)}</h3>
+                        </div>
+                        <!-- Category dot + name -->
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
+                            <span style="font-size:11px;color:var(--text-secondary)">${escapeHtml(categoryName)}</span>
+                        </div>
+                        ${goal.description ? `<p style="font-size:11px;color:var(--text-secondary);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${escapeHtml(goal.description)}</p>` : ''}
+                    </div>
+                    <!-- Progress % -->
+                    <span style="font-size:13px;font-weight:700;color:${progress >= 100 ? 'var(--success)' : 'var(--text-secondary)'};flex-shrink:0">${progress}%</span>
+                </div>
+
+                <!-- Progress bar -->
+                <div style="width:100%;height:5px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:10px">
+                    <div style="height:100%;width:${progress}%;background:${barColor};border-radius:99px;transition:width 0.3s ease"></div>
+                </div>
+
+                <!-- Footer row -->
+                <div class="flex items-center justify-between">
+                    <!-- Task count -->
+                    <span style="font-size:11px;color:var(--text-secondary)">
+                        ${taskCounts.total > 0
+                            ? `<i class="fas fa-check-square" style="margin-right:4px;opacity:0.6"></i>${taskCounts.completed}/${taskCounts.total} tasks`
+                            : `<span style="opacity:0.5">No tasks</span>`}
+                    </span>
+                    <!-- Due date + complete btn -->
+                    <div class="flex items-center gap-2">
+                        ${hasDeadline
+                            ? `<span style="font-size:11px;color:${dueDate.isOverdue ? 'var(--danger)' : 'var(--text-secondary)'};font-weight:${dueDate.isOverdue ? '600' : '400'}">
+                                <i class="fas fa-clock" style="margin-right:3px;opacity:0.7"></i>${dueDate.text}
+                               </span>`
+                            : `<span style="font-size:11px;color:var(--text-secondary);opacity:0.4"><i class="fas fa-infinity"></i></span>`}
+                        ${progress >= 100
+                            ? `<button onclick="event.stopPropagation();markGoalComplete('${goal.id}');"
+                                 style="background:none;border:none;cursor:pointer;color:var(--success);font-size:15px;padding:0"
+                                 title="Mark as complete"><i class="fas fa-check-circle"></i></button>`
+                            : ''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
     }).join('');
 }
 
