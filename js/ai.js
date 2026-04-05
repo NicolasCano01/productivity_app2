@@ -354,7 +354,7 @@ function clearAIChat() {
         messagesContainer.innerHTML = `
             <div class="ai-chat-welcome">
                 <div class="ai-chat-welcome-icon">
-                    <i class="fas fa-robot"></i>
+                    <i class="fas fa-stars"></i>
                 </div>
                 <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Hi there!</div>
                 <div style="font-size:13px;color:var(--text-secondary);line-height:1.5;max-width:280px">
@@ -395,7 +395,7 @@ async function sendAIChat() {
     const loadingId = 'ai-loading-' + Date.now();
     messagesContainer.innerHTML += `
         <div id="${loadingId}" class="ai-chat-bubble-ai">
-            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-robot"></i></div>
+            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-stars"></i></div>
             <div class="ai-chat-bubble-content">
                 <div class="flex items-center gap-2">
                     <div class="spinner" style="width:14px;height:14px;border-width:2px"></div>
@@ -426,7 +426,7 @@ async function sendAIChat() {
     // Add AI response to UI
     messagesContainer.innerHTML += `
         <div class="ai-chat-bubble-ai">
-            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-robot"></i></div>
+            <div class="ai-chat-bubble-ai-avatar"><i class="fas fa-stars"></i></div>
             <div class="ai-chat-bubble-content">${formatAIResponse(aiResponse)}</div>
         </div>
     `;
