@@ -117,8 +117,10 @@ function buildUpcomingView(today, todayStr) {
 }
 
 function buildUpcomingTaskList(today, todayStr) {
-    // Gather non-completed tasks WITH a due date only (no-date tasks belong in Tasks panel)
-    const activeTasks = appState.tasks.filter(t => !t.is_completed && t.due_date);
+    // Gather non-deleted, non-completed tasks WITH a due date only
+    const activeTasks = appState.tasks.filter(t =>
+        t.status !== 'deleted' && !t.is_completed && t.due_date
+    );
 
     // Group: overdue, byDate (future + today)
     const overdue = [];
@@ -208,11 +210,12 @@ function renderUpcomingTaskCard(task, isOverdue = false) {
     return `
         <div class="task-card" style="cursor:pointer" onclick="openTaskModal('${task.id}')">
             <div class="flex items-center gap-3">
-                <div class="task-checkbox ${task.is_completed ? 'checked' : ''}" onclick="event.stopPropagation();toggleTaskCompletion('${task.id}')"></div>
+                <div class="task-checkbox ${task.is_completed ? 'checked' : ''}"
+                     onclick="event.stopPropagation();toggleTaskCompletion('${task.id}')"></div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         ${task.category ? `<div class="category-dot" style="background-color:${categoryColor};flex-shrink:0"></div>` : ''}
-                        <span class="font-semibold flex-1 truncate" style="font-size:15px;color:var(--text-primary)">${escapeHtml(task.title)}</span>
+                        <span class="font-semibold flex-1 truncate" style="font-size:15px;color:var(--text-primary);${task.is_completed ? 'text-decoration:line-through;opacity:0.5' : ''}">${escapeHtml(task.title)}</span>
                         ${severity ? `<span class="overdue-badge overdue-${severity}">OVERDUE</span>` : ''}
                     </div>
                     <div class="flex items-center gap-1.5 mt-0.5 flex-wrap" style="font-size:11px;color:var(--text-secondary)">
@@ -221,9 +224,23 @@ function renderUpcomingTaskCard(task, isOverdue = false) {
                         ${task.due_date ? `<span style="color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'};${severity ? 'font-weight:600' : ''}">${dueDateText}</span>` : ''}
                     </div>
                 </div>
+                <!-- Quick-delete button (same pattern as tasks panel) -->
+                <button onclick="event.stopPropagation();deleteTaskFromCalendar('${task.id}')"
+                    style="width:28px;height:28px;border-radius:50%;border:none;background:none;color:var(--text-secondary);opacity:0.4;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:opacity 0.15s,color 0.15s"
+                    onmouseover="this.style.opacity='1';this.style.color='var(--danger)'"
+                    onmouseout="this.style.opacity='0.4';this.style.color='var(--text-secondary)'"
+                    title="Delete task">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
             </div>
         </div>
     `;
+}
+
+function deleteTaskFromCalendar(taskId) {
+    if (typeof deleteTask === 'function') {
+        deleteTask(taskId);
+    }
 }
 
 function getUpcomingDateLabel(dStr, todayStr, today) {
@@ -285,8 +302,15 @@ function buildMonthView(today, todayStr) {
         const isToday = dStr === todayStr;
         const isSelected = dStr === selectedDate;
         const isPast = d < today;
-        const activities = getDateActivities(dStr);
-        const hasActivity = activities.habits > 0 || activities.tasks > 0 || activities.goals > 0;
+
+        // Dot rule:
+        //  - Past days  → only show dot if a task was completed on that day
+        //  - Today/future → show dot if any non-deleted task is due that day
+        const hasDot = isPast
+            ? wasTaskCompletedOn(dStr)
+            : appState.tasks.some(t =>
+                t.status !== 'deleted' && t.due_date === dStr && !t.is_completed
+              );
 
         let cellStyle = 'height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;';
         let numStyle = 'font-size:13px;font-weight:600;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;';
@@ -298,7 +322,7 @@ function buildMonthView(today, todayStr) {
 
         html += `<div style="${cellStyle}" onclick="selectCalendarDate('${dStr}')">
             <div style="${numStyle}">${day}</div>
-            ${hasActivity ? `<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)"></div>` : ''}
+            ${hasDot ? `<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)"></div>` : ''}
         </div>`;
     }
 
@@ -397,9 +421,21 @@ function jumpToToday() {
 function getDateActivities(dateStr) {
     const activities = { habits: 0, tasks: 0, goals: 0 };
     activities.habits = appState.habitCompletions.filter(c => c.completion_date === dateStr).length;
-    activities.tasks = appState.tasks.filter(t => t.due_date === dateStr && !t.is_completed).length;
+    activities.tasks = appState.tasks.filter(t =>
+        t.status !== 'deleted' && t.due_date === dateStr && !t.is_completed
+    ).length;
     activities.goals = appState.goals.filter(g => g.due_date === dateStr && g.status === 'active').length;
     return activities;
+}
+
+// Returns true if any task was *completed* on the given dateStr (Melbourne TZ)
+function wasTaskCompletedOn(dateStr) {
+    return appState.tasks.some(t => {
+        if (t.status === 'deleted' || !t.is_completed || !t.completed_at) return false;
+        const completedDate = new Date(t.completed_at)
+            .toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+        return completedDate === dateStr;
+    });
 }
 
 function formatDateForDB(date) {
@@ -426,7 +462,9 @@ function formatDateForDisplay(dateStr) {
 
 function buildDateDetailsContent(dateStr) {
     const habitCompletions = appState.habitCompletions.filter(c => c.completion_date === dateStr);
-    const tasksOnDate = appState.tasks.filter(t => t.due_date === dateStr);
+    const tasksOnDate = appState.tasks.filter(t =>
+        t.status !== 'deleted' && t.due_date === dateStr
+    );
     const goalsOnDate = appState.goals.filter(g => g.due_date === dateStr && g.status === 'active');
 
     let habitsHtml = '';
