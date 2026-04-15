@@ -691,6 +691,53 @@ body.dark #login-modal input {
     color: var(--text-primary) !important;
 }
 
+/* ---- Pinned Tasks Grid ---- */
+.pinned-tasks-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pinned-task-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    min-height: 100px;
+    transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.pinned-task-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.pinned-task-card:active {
+    transform: scale(0.98);
+}
+
+.pinned-task-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pinned-task-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex: 1;
+}
+
 /* ---- AI Chat FAB (floating action button) ---- */
 .ai-chat-fab {
     position: fixed;

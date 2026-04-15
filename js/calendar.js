@@ -113,7 +113,58 @@ function buildUpcomingView(today, todayStr) {
     // Task list — grouped by date section, all upcoming tasks
     const taskListHtml = buildUpcomingTaskList(today, todayStr);
 
-    return stripHtml + aiInsightsHtml + taskListHtml;
+    const pinnedHtml = buildPinnedTasksSection();
+    return stripHtml + aiInsightsHtml + taskListHtml + pinnedHtml;
+}
+
+// ============================================
+// PINNED TASKS SECTION
+// ============================================
+function buildPinnedTasksSection() {
+    const pinned = appState.tasks.filter(t =>
+        t.is_pinned && t.status !== 'deleted' && !t.is_completed
+    );
+    if (pinned.length === 0) return '';
+
+    const cards = pinned.map(task => {
+        const cat = task.category;
+        const catColor = cat?.color_hex || '#6B7280';
+        const due = task.due_date ? formatDueDate(task.due_date) : null;
+        const isOverdue = task.due_date
+            ? new Date(task.due_date + 'T00:00:00') < new Date(getMelbourneDateString() + 'T00:00:00')
+            : false;
+
+        return `
+        <div class="pinned-task-card" onclick="openTaskModal('${task.id}')">
+            <div class="pinned-task-card-top">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                    <div style="width:7px;height:7px;border-radius:50%;background:${catColor};flex-shrink:0"></div>
+                    <span style="font-size:10px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat ? escapeHtml(cat.name) : 'No category'}</span>
+                </div>
+                <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
+                    style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px"
+                    title="Unpin">
+                    <i class="fas fa-thumbtack"></i>
+                </button>
+            </div>
+            <p class="pinned-task-card-title">${escapeHtml(task.title)}</p>
+            ${due ? `<p style="font-size:10px;margin-top:auto;padding-top:6px;color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'}">
+                <i class="fas fa-clock" style="margin-right:3px;opacity:0.7"></i>${due}
+            </p>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="mt-5">
+        <div class="flex items-center gap-2 mb-3" style="padding:0 2px">
+            <i class="fas fa-thumbtack" style="font-size:11px;color:var(--accent)"></i>
+            <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--text-secondary);text-transform:uppercase">Pinned</span>
+            <span style="font-size:11px;color:var(--text-secondary);opacity:0.6">(${pinned.length})</span>
+        </div>
+        <div class="pinned-tasks-grid">
+            ${cards}
+        </div>
+    </div>`;
 }
 
 function buildUpcomingTaskList(today, todayStr) {
@@ -224,7 +275,13 @@ function renderUpcomingTaskCard(task, isOverdue = false) {
                         ${task.due_date ? `<span style="color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'};${severity ? 'font-weight:600' : ''}">${dueDateText}</span>` : ''}
                     </div>
                 </div>
-                <!-- Quick-delete button (same pattern as tasks panel) -->
+                <!-- Pin button -->
+                <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
+                    style="width:28px;height:28px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:${task.is_pinned ? 'var(--accent)' : 'var(--text-secondary)'};opacity:${task.is_pinned ? '1' : '0.4'};transform:rotate(${task.is_pinned ? '0' : '-45'}deg);transition:all 0.15s"
+                    title="${task.is_pinned ? 'Unpin' : 'Pin task'}">
+                    <i class="fas fa-thumbtack"></i>
+                </button>
+                <!-- Quick-delete button -->
                 <button onclick="event.stopPropagation();deleteTaskFromCalendar('${task.id}')"
                     style="width:28px;height:28px;border-radius:50%;border:none;background:none;color:var(--text-secondary);opacity:0.4;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:opacity 0.15s,color 0.15s"
                     onmouseover="this.style.opacity='1';this.style.color='var(--danger)'"
@@ -462,10 +519,29 @@ function formatDateForDisplay(dateStr) {
 
 function buildDateDetailsContent(dateStr) {
     const habitCompletions = appState.habitCompletions.filter(c => c.completion_date === dateStr);
-    const tasksOnDate = appState.tasks.filter(t =>
-        t.status !== 'deleted' && t.due_date === dateStr
-    );
     const goalsOnDate = appState.goals.filter(g => g.due_date === dateStr && g.status === 'active');
+
+    // For past days show tasks COMPLETED on that date (by completed_at).
+    // For today / future show tasks DUE on that date.
+    const today = getMelbourneDate();
+    today.setHours(0, 0, 0, 0);
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    dateObj.setHours(0, 0, 0, 0);
+    const isPast = dateObj < today;
+
+    let tasksOnDate;
+    if (isPast) {
+        tasksOnDate = appState.tasks.filter(t => {
+            if (t.status === 'deleted' || !t.is_completed || !t.completed_at) return false;
+            const cd = new Date(t.completed_at)
+                .toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+            return cd === dateStr;
+        });
+    } else {
+        tasksOnDate = appState.tasks.filter(t =>
+            t.status !== 'deleted' && t.due_date === dateStr
+        );
+    }
 
     let habitsHtml = '';
     if (habitCompletions.length > 0) {

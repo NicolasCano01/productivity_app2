@@ -437,6 +437,10 @@ function renderTaskCard(task, dateGroup = null) {
         `;
     }
 
+    const pinIcon = task.is_pinned ? 'fas fa-thumbtack' : 'far fa-thumbtack';
+    const pinColor = task.is_pinned ? 'var(--accent)' : 'var(--text-secondary)';
+    const pinOpacity = task.is_pinned ? '1' : '0.35';
+
     return `
         <div class="task-card ${task.is_completed ? 'completed' : ''}" ${dragHandlers}>
             <div class="flex items-start gap-3">
@@ -457,9 +461,42 @@ function renderTaskCard(task, dateGroup = null) {
                     ${metaHtml}
                     ${task.notes ? `<p class="line-clamp-2 mt-1" style="font-size:12px;color:var(--text-secondary)">${escapeHtml(task.notes)}</p>` : ''}
                 </div>
+
+                <!-- Pin button -->
+                <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
+                    style="flex-shrink:0;width:28px;height:28px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:${pinColor};opacity:${pinOpacity};transition:opacity 0.15s,color 0.15s;transform:rotate(${task.is_pinned ? '0' : '-45'}deg)"
+                    title="${task.is_pinned ? 'Unpin task' : 'Pin task'}">
+                    <i class="fas fa-thumbtack"></i>
+                </button>
             </div>
         </div>
     `;
+}
+
+async function togglePinTask(taskId) {
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const newPinned = !task.is_pinned;
+    task.is_pinned = newPinned;
+
+    // Re-render both panels if visible
+    renderTasks();
+    if (typeof renderCalendar === 'function' && currentPanel === 'calendar') {
+        renderCalendar();
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('tasks')
+            .update({ is_pinned: newPinned })
+            .eq('id', taskId);
+        if (error) throw error;
+    } catch (err) {
+        console.error('Error toggling pin:', err);
+        task.is_pinned = !newPinned; // revert
+        renderTasks();
+    }
 }
 
 // Filter tasks (called from search/filter inputs)
