@@ -65,6 +65,8 @@ function switchPanel(panelName) {
         renderAnalytics();
     } else if (panelName === 'calendar') {
         renderCalendar();
+    } else if (panelName === 'board') {
+        if (typeof renderBoard === 'function') renderBoard();
     }
 
     // Show/hide AI chat FAB on Calendar & Analytics panels only
@@ -190,6 +192,8 @@ function closeModalOnBackdrop(event, modalId) {
             closeTaskModal();
         } else if (modalId === 'goal-modal') {
             closeGoalModal();
+        } else if (modalId === 'note-modal') {
+            closeNoteModal();
         }
     }
 }

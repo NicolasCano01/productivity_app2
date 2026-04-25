@@ -1058,6 +1058,81 @@ body.dark #login-modal input {
 }
 
 /* ============================================
+   CORK BOARD / STICKY NOTES
+   ============================================ */
+
+.board-notes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.note-card {
+    border-radius: 14px;
+    padding: 14px 14px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    min-height: 110px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    position: relative;
+}
+
+.note-card:hover {
+    transform: translateY(-2px) rotate(0.5deg);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+
+.note-card:active {
+    transform: scale(0.97);
+}
+
+.note-card-body {
+    flex: 1;
+}
+
+.note-card-text {
+    font-size: 13px;
+    line-height: 1.5;
+    font-weight: 500;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.note-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.note-color-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s ease, outline 0.15s ease;
+    flex-shrink: 0;
+}
+
+.note-color-btn:hover {
+    transform: scale(1.15);
+}
+
+/* Pinned task note has accent border */
+.pinned-note {
+    cursor: pointer;
+}
+
+/* ============================================
    DESKTOP LAYOUT (1024px+)
    ============================================ */
 @media (min-width: 1024px) {
@@ -1229,6 +1304,11 @@ body.dark #login-modal input {
 
     /* Pinned tasks grid: more columns on desktop */
     .pinned-tasks-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Cork board: 3-column grid on desktop */
+    .board-notes-grid {
         grid-template-columns: repeat(3, 1fr);
     }
 

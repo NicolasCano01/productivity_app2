@@ -290,10 +290,57 @@
                 </div>
             </div>
 
-            
-            
+            <!-- PANEL 6: CORK BOARD (Quick Notes) -->
+            <div id="board-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold" style="color:var(--text-primary)">Board</h2>
+                        <p style="font-size:12px;color:var(--text-secondary);margin-top:2px">Quick notes &amp; pinned tasks</p>
+                    </div>
+                    <button onclick="openNoteModal()" class="touch-target rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition"
+                        style="background:var(--accent);color:#fff">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div id="board-notes-grid" class="board-notes-grid"></div>
+                <div id="board-pinned-section"></div>
+            </div>
+
+            <!-- Note Modal -->
+            <div id="note-modal" class="modal hidden" onclick="closeModalOnBackdrop(event,'note-modal')">
+                <div class="modal-content p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold" style="color:var(--text-primary)" id="note-modal-title">Add Note</h3>
+                        <button onclick="closeNoteModal()" style="color:var(--text-secondary);background:none;border:none;cursor:pointer;font-size:20px">&times;</button>
+                    </div>
+                    <textarea id="note-content" rows="5" placeholder="Write your note here..." class="w-full rounded-xl p-3 mb-3"
+                        style="border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:14px;resize:none;font-family:var(--font-system);outline:none"></textarea>
+                    <div class="mb-4">
+                        <p style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">COLOR</p>
+                        <div class="flex gap-2 flex-wrap" id="note-color-picker">
+                            <button onclick="selectNoteColor('#FEF08A')" class="note-color-btn" style="background:#FEF08A" data-color="#FEF08A" title="Yellow"></button>
+                            <button onclick="selectNoteColor('#BBF7D0')" class="note-color-btn" style="background:#BBF7D0" data-color="#BBF7D0" title="Green"></button>
+                            <button onclick="selectNoteColor('#BFDBFE')" class="note-color-btn" style="background:#BFDBFE" data-color="#BFDBFE" title="Blue"></button>
+                            <button onclick="selectNoteColor('#FCA5A5')" class="note-color-btn" style="background:#FCA5A5" data-color="#FCA5A5" title="Red"></button>
+                            <button onclick="selectNoteColor('#E9D5FF')" class="note-color-btn" style="background:#E9D5FF" data-color="#E9D5FF" title="Purple"></button>
+                            <button onclick="selectNoteColor('#FED7AA')" class="note-color-btn" style="background:#FED7AA" data-color="#FED7AA" title="Orange"></button>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="delete-note-btn" onclick="deleteNote()" class="hidden px-4 py-2 rounded-xl text-sm font-semibold transition"
+                            style="background:rgba(255,59,48,0.1);color:var(--danger);border:none;cursor:pointer">
+                            <i class="fas fa-trash-alt mr-1"></i> Delete
+                        </button>
+                        <button onclick="saveNote()" class="flex-1 py-2.5 rounded-xl font-semibold text-sm transition"
+                            style="background:var(--accent);color:#fff;border:none;cursor:pointer">
+                            Save Note
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </main>
-        
+
         <!-- Bottom Navigation -->
         <nav id="main-nav" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-around" style="z-index: 9999; padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
             <div id="nav-wrapper" class="flex justify-around items-center">
@@ -312,6 +359,10 @@
                 <button class="nav-btn active" data-panel="calendar" onclick="switchPanel('calendar')">
                     <i class="fas fa-calendar"></i>
                     <span>Calendar</span>
+                </button>
+                <button class="nav-btn" data-panel="board" onclick="switchPanel('board')">
+                    <i class="fas fa-thumbtack"></i>
+                    <span>Board</span>
                 </button>
                 <button class="nav-btn" data-panel="analytics" onclick="switchPanel('analytics')">
                     <i class="fas fa-chart-line"></i>
@@ -531,8 +582,6 @@
         </div>
     </div>
 
-REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
-
 <!-- Goal Modal -->
 <div id="goal-modal" class="modal hidden" onclick="closeModalOnBackdrop(event, 'goal-modal')">
     <div class="modal-content" onclick="event.stopPropagation()">
@@ -712,6 +761,7 @@ REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
     <script src="js/calendar.js"></script>
     <script src="js/analytics.js"></script>
     <script src="js/ai.js"></script>
+    <script src="js/corkboard.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
