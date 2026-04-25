@@ -2,6 +2,10 @@
 // PRODUCTIVITY HUB - TASKS PANEL (ENHANCED)
 // ============================================
 
+// Multi-category and objective state for the task modal
+let selectedCategoryIds = new Set();
+let editingObjectives = [];
+
 // Switch task view (All/Overdue/Upcoming/Completed/Deleted)
 function switchTaskView(view) {
     currentTaskView = view;
@@ -380,7 +384,11 @@ function renderTasks() {
 // Render individual task card
 function renderTaskCard(task, dateGroup = null) {
     const isDeleted = task.status === 'deleted';
-    const categoryColor = task.category?.color_hex || '#6B7280';
+    // Use multi-categories if available, fall back to single category
+    const allCategories = (task.extraCategories && task.extraCategories.length > 0)
+        ? task.extraCategories
+        : (task.category ? [task.category] : []);
+    const categoryColor = allCategories[0]?.color_hex || task.category?.color_hex || '#6B7280';
     const severity = isDeleted ? null : getOverdueSeverity(task.due_date);
     const dueDateText = formatDueDate(task.due_date);
 
@@ -395,12 +403,23 @@ function renderTaskCard(task, dateGroup = null) {
     ` : '';
 
     const metaParts = [];
-    if (task.category) metaParts.push(`<span>${task.category.name}</span>`);
-    if (task.goal) metaParts.push(`<span class="goal-link"><i class="fas fa-bullseye" style="font-size:9px"></i> ${task.goal.name}</span>`);
+    // Show up to 2 category names if multi-categories loaded, else just one
+    if (allCategories.length > 0) {
+        const catNames = allCategories.slice(0, 2).map(c => escapeHtml(c.name)).join(', ');
+        const extra = allCategories.length > 2 ? ` +${allCategories.length - 2}` : '';
+        metaParts.push(`<span>${catNames}${extra}</span>`);
+    }
+    if (task.goal) metaParts.push(`<span class="goal-link"><i class="fas fa-bullseye" style="font-size:9px"></i> ${escapeHtml(task.goal.name)}</span>`);
     if (task.due_date) {
         metaParts.push(`<span class="${severity ? 'font-semibold' : ''}" style="color:${severity ? 'var(--danger)' : 'var(--text-secondary)'}">${dueDateText}</span>`);
     }
     if (task.is_recurring) metaParts.push(`<span style="color:var(--accent)"><i class="fas fa-repeat" style="font-size:9px"></i> Recurring</span>`);
+    // Objectives progress
+    const activeObjs = (task.objectives || []).filter(o => !o.isDeleted);
+    if (activeObjs.length > 0) {
+        const doneCt = activeObjs.filter(o => o.is_completed).length;
+        metaParts.push(`<span style="color:var(--text-secondary)"><i class="fas fa-list-check" style="font-size:9px"></i> ${doneCt}/${activeObjs.length}</span>`);
+    }
     if (isDeleted && task.deleted_at) {
         const deletedDate = new Date(task.deleted_at);
         const deletedText = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -424,7 +443,7 @@ function renderTaskCard(task, dateGroup = null) {
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
-                            ${task.category ? `<div class="category-dot" style="background-color:${categoryColor}"></div>` : ''}
+                            ${allCategories.slice(0, 3).map(c => `<div class="category-dot" style="background-color:${c.color_hex || '#6B7280'}"></div>`).join('')}
                             <h3 class="font-semibold flex-1 truncate" style="font-size:15px;color:var(--text-secondary);text-decoration:line-through">
                                 ${escapeHtml(task.title)}
                             </h3>
@@ -452,7 +471,7 @@ function renderTaskCard(task, dateGroup = null) {
 
                 <div class="flex-1 min-w-0" onclick="openTaskModal('${task.id}')">
                     <div class="flex items-center gap-2">
-                        ${task.category ? `<div class="category-dot" style="background-color:${categoryColor}"></div>` : ''}
+                        ${allCategories.slice(0, 3).map(c => `<div class="category-dot" style="background-color:${c.color_hex || '#6B7280'}"></div>`).join('')}
                         <h3 class="font-semibold flex-1 truncate" style="font-size:15px;color:${task.is_completed ? 'var(--text-secondary)' : 'var(--text-primary)'};${task.is_completed ? 'text-decoration:line-through' : ''}">
                             ${escapeHtml(task.title)}
                         </h3>
@@ -639,15 +658,23 @@ function openTaskModal(taskId = null) {
         }
         
         console.log('✏️ Filling form with task data:', task.title);
-        
+
         modalTitle.textContent = 'Edit Task';
         document.getElementById('task-title').value = task.title || '';
         document.getElementById('task-notes').value = task.notes || '';
-        document.getElementById('task-category').value = task.category_id || '';
         document.getElementById('task-goal').value = task.goal_id || '';
         document.getElementById('task-due-date').value = task.due_date || '';
         document.getElementById('task-is-recurring').checked = task.is_recurring || false;
-        
+
+        // Populate multi-category picker
+        const cats = (task.extraCategories && task.extraCategories.length > 0)
+            ? task.extraCategories.map(c => c.id)
+            : (task.category_id ? [task.category_id] : []);
+        selectedCategoryIds = new Set(cats);
+
+        // Populate objectives
+        editingObjectives = (task.objectives || []).map(o => ({ ...o }));
+
         if (task.is_recurring) {
             document.getElementById('recurring-options').classList.remove('hidden');
             document.getElementById('task-recurrence-type').value = task.recurrence_type || 'daily';
@@ -658,7 +685,7 @@ function openTaskModal(taskId = null) {
         } else {
             document.getElementById('recurring-options').classList.add('hidden');
         }
-        
+
         deleteBtn.classList.remove('hidden');
     } else {
         // Create new task
@@ -666,8 +693,12 @@ function openTaskModal(taskId = null) {
         form.reset();
         document.getElementById('recurring-options').classList.add('hidden');
         deleteBtn.classList.add('hidden');
+        selectedCategoryIds = new Set();
+        editingObjectives = [];
     }
-    
+
+    renderCategoryPicker();
+    renderObjectivesList();
     modal.classList.remove('hidden');
 }
 
@@ -687,7 +718,9 @@ async function saveTask(event) {
     
     const title = document.getElementById('task-title').value.trim();
     const notes = document.getElementById('task-notes').value.trim() || null;
-    const categoryId = document.getElementById('task-category').value || null;
+    // primary category_id = first selected category (backwards compat)
+    const catIds = [...selectedCategoryIds];
+    const categoryId = catIds[0] || null;
     const goalId = document.getElementById('task-goal').value || null;
     const dueDate = document.getElementById('task-due-date').value || null;
     const isRecurring = document.getElementById('task-is-recurring').checked;
@@ -713,6 +746,8 @@ async function saveTask(event) {
     }
     
     try {
+        let savedTaskId = editingTaskId;
+
         if (editingTaskId) {
             const { error } = await supabaseClient
                 .from('tasks')
@@ -725,29 +760,25 @@ async function saveTask(event) {
                     ...recurrenceData
                 })
                 .eq('id', editingTaskId);
-            
+
             if (error) throw error;
-            
-            // Refetch tasks to get updated relations
+
+            // Refetch task to get updated relations
             const { data: updatedTask } = await supabaseClient
                 .from('tasks')
-                .select(`
-                    *,
-                    category:categories(id, name, color_hex),
-                    goal:goals(id, name)
-                `)
+                .select('*, category:categories(id, name, color_hex), goal:goals(id, name)')
                 .eq('id', editingTaskId)
                 .single();
-            
+
             const taskIndex = appState.tasks.findIndex(t => t.id === editingTaskId);
             if (taskIndex !== -1 && updatedTask) {
                 appState.tasks[taskIndex] = updatedTask;
             }
-            
+
             showToast('Task updated!', 'success');
         } else {
             const maxOrder = Math.max(0, ...appState.tasks.map(t => t.user_order || 0));
-            
+
             const { data, error } = await supabaseClient
                 .from('tasks')
                 .insert({
@@ -761,20 +792,54 @@ async function saveTask(event) {
                     status: 'active',
                     ...recurrenceData
                 })
-                .select(`
-                    *,
-                    category:categories(id, name, color_hex),
-                    goal:goals(id, name)
-                `)
+                .select('*, category:categories(id, name, color_hex), goal:goals(id, name)')
                 .single();
-            
+
             if (error) throw error;
-            
+
+            savedTaskId = data.id;
             appState.tasks.push(data);
-            
             showToast('Task created!', 'success');
         }
-        
+
+        // Sync multi-categories (if migration has been run)
+        if (appState.hasMultiCategories && savedTaskId) {
+            await supabaseClient.from('task_categories').delete().eq('task_id', savedTaskId);
+            if (catIds.length > 0) {
+                await supabaseClient.from('task_categories').insert(
+                    catIds.map(cid => ({ task_id: savedTaskId, category_id: cid }))
+                );
+            }
+        }
+
+        // Sync objectives (if migration has been run)
+        if (appState.hasObjectives && savedTaskId) {
+            const toDelete = editingObjectives.filter(o => !o.isNew && o.isDeleted && o.id);
+            for (const obj of toDelete) {
+                await supabaseClient.from('task_objectives').delete().eq('id', obj.id);
+            }
+            const toUpdate = editingObjectives.filter(o => !o.isNew && !o.isDeleted && o.id);
+            for (const obj of toUpdate) {
+                await supabaseClient.from('task_objectives').update({ is_completed: obj.is_completed }).eq('id', obj.id);
+            }
+            const toInsert = editingObjectives.filter(o => o.isNew && !o.isDeleted);
+            if (toInsert.length > 0) {
+                await supabaseClient.from('task_objectives').insert(
+                    toInsert.map((obj, i) => ({
+                        task_id: savedTaskId,
+                        title: obj.title,
+                        is_completed: obj.is_completed,
+                        display_order: i
+                    }))
+                );
+            }
+        }
+
+        // Reload relations for this task so appState reflects saved state
+        if (savedTaskId && (appState.hasMultiCategories || appState.hasObjectives)) {
+            await loadTaskRelations([savedTaskId]);
+        }
+
         renderTasks();
         closeTaskModal();
         if (submitBtn) submitBtn.disabled = false;
@@ -890,6 +955,116 @@ async function restoreTask(taskId) {
         renderTasks();
         showToast('Failed to restore task', 'error');
     }
+}
+
+// ============================================
+// MULTI-CATEGORY PICKER HELPERS
+// ============================================
+function renderCategoryPicker() {
+    const container = document.getElementById('task-categories-picker');
+    if (!container) return;
+
+    const countEl = document.getElementById('categories-selected-count');
+    if (countEl) countEl.textContent = selectedCategoryIds.size > 0 ? `${selectedCategoryIds.size} selected` : '';
+
+    const sorted = [...appState.categories].sort((a, b) => (a.user_order || 0) - (b.user_order || 0));
+
+    if (sorted.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);padding:4px">No categories yet</span>';
+        return;
+    }
+
+    container.innerHTML = sorted.map(cat => {
+        const isSelected = selectedCategoryIds.has(cat.id);
+        const bg = isSelected ? (cat.color_hex || 'var(--accent)') : 'var(--bg-primary)';
+        const textColor = isSelected ? '#fff' : 'var(--text-primary)';
+        const border = isSelected ? 'transparent' : 'var(--border)';
+        return `
+            <button type="button" onclick="toggleCategorySelection('${cat.id}')"
+                style="background:${bg};color:${textColor};border:1.5px solid ${border};border-radius:20px;
+                       padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;
+                       transition:all 0.15s;display:inline-flex;align-items:center;gap:5px">
+                ${isSelected ? '<i class="fas fa-check" style="font-size:9px"></i>' : ''}
+                ${escapeHtml(cat.name)}
+            </button>
+        `;
+    }).join('');
+}
+
+function toggleCategorySelection(catId) {
+    if (selectedCategoryIds.has(catId)) {
+        selectedCategoryIds.delete(catId);
+    } else {
+        selectedCategoryIds.add(catId);
+    }
+    renderCategoryPicker();
+}
+
+// ============================================
+// OBJECTIVES (SUB-TASK CHECKLIST) HELPERS
+// ============================================
+function renderObjectivesList() {
+    const container = document.getElementById('task-objectives-list');
+    if (!container) return;
+
+    const progressEl = document.getElementById('objectives-progress-label');
+    const active = editingObjectives.filter(o => !o.isDeleted);
+    const done = active.filter(o => o.is_completed).length;
+    if (progressEl) progressEl.textContent = active.length > 0 ? `${done}/${active.length} done` : '';
+
+    if (active.length === 0) {
+        container.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);padding:2px 0">No objectives yet</p>';
+        return;
+    }
+
+    container.innerHTML = active.map((obj, i) => `
+        <div class="flex items-center gap-2" style="padding:4px 0;border-bottom:1px solid var(--border)">
+            <input type="checkbox" ${obj.is_completed ? 'checked' : ''}
+                onchange="toggleObjectiveItem(${i})"
+                style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);flex-shrink:0">
+            <span style="flex:1;font-size:13px;color:var(--text-primary);${obj.is_completed ? 'text-decoration:line-through;opacity:0.5' : ''}">${escapeHtml(obj.title)}</span>
+            <button type="button" onclick="removeObjectiveItem(${i})"
+                style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:11px;padding:2px 4px;opacity:0.5"
+                title="Remove">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function addObjectiveItem() {
+    const input = document.getElementById('new-objective-input');
+    if (!input) return;
+    const title = input.value.trim();
+    if (!title) return;
+    editingObjectives.push({
+        id: null, task_id: editingTaskId, title,
+        is_completed: false,
+        display_order: editingObjectives.filter(o => !o.isDeleted).length,
+        isNew: true
+    });
+    input.value = '';
+    renderObjectivesList();
+}
+
+function toggleObjectiveItem(index) {
+    const active = editingObjectives.filter(o => !o.isDeleted);
+    if (active[index]) {
+        active[index].is_completed = !active[index].is_completed;
+        renderObjectivesList();
+    }
+}
+
+function removeObjectiveItem(index) {
+    const active = editingObjectives.filter(o => !o.isDeleted);
+    const obj = active[index];
+    if (!obj) return;
+    if (obj.isNew) {
+        editingObjectives.splice(editingObjectives.indexOf(obj), 1);
+    } else {
+        obj.isDeleted = true;
+    }
+    renderObjectivesList();
 }
 
 // ============================================

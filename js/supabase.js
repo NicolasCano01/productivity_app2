@@ -176,6 +176,9 @@ async function fetchInitialData() {
         // Populate filter dropdowns
         populateFilterDropdowns();
 
+        // Try loading multi-category + objectives relations (graceful if tables don't exist yet)
+        await loadTaskRelations();
+
         appState.isLoading = false;
 
         return true;
@@ -184,6 +187,68 @@ async function fetchInitialData() {
         appState.error = error.message;
         showToast('Failed to load data', 'error');
         return false;
+    }
+}
+
+// ============================================
+// MULTI-CATEGORY + OBJECTIVES RELATIONS
+// ============================================
+async function loadTaskRelations(taskIds = null) {
+    // task_categories
+    try {
+        let q = supabaseClient
+            .from('task_categories')
+            .select('task_id, category_id, categories(id, name, color_hex)');
+        if (taskIds) q = q.in('task_id', taskIds);
+
+        const { data: taskCats, error } = await q;
+
+        if (error) {
+            appState.hasMultiCategories = false;
+        } else {
+            const catsByTask = {};
+            (taskCats || []).forEach(tc => {
+                if (!catsByTask[tc.task_id]) catsByTask[tc.task_id] = [];
+                if (tc.categories) catsByTask[tc.task_id].push(tc.categories);
+            });
+            appState.tasks.forEach(task => {
+                if (!taskIds || taskIds.includes(task.id)) {
+                    task.extraCategories = catsByTask[task.id] || [];
+                }
+            });
+            appState.hasMultiCategories = true;
+        }
+    } catch (e) {
+        appState.hasMultiCategories = false;
+    }
+
+    // task_objectives
+    try {
+        let q = supabaseClient
+            .from('task_objectives')
+            .select('*')
+            .order('display_order');
+        if (taskIds) q = q.in('task_id', taskIds);
+
+        const { data: objectives, error } = await q;
+
+        if (error) {
+            appState.hasObjectives = false;
+        } else {
+            const objByTask = {};
+            (objectives || []).forEach(obj => {
+                if (!objByTask[obj.task_id]) objByTask[obj.task_id] = [];
+                objByTask[obj.task_id].push(obj);
+            });
+            appState.tasks.forEach(task => {
+                if (!taskIds || taskIds.includes(task.id)) {
+                    task.objectives = objByTask[task.id] || [];
+                }
+            });
+            appState.hasObjectives = true;
+        }
+    } catch (e) {
+        appState.hasObjectives = false;
     }
 }
 
