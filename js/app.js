@@ -84,6 +84,9 @@ async function initApp() {
     // Step 6: Purge records older than 30 days (non-blocking, non-critical)
     purgeSoftDeleted();
 
+    // Step 6b: Start keep-alive ping so Supabase connection doesn't go idle
+    startSupabaseKeepAlive();
+
     // Step 7: Show success message
     showToast('✨ All data loaded successfully!', 'success');
 

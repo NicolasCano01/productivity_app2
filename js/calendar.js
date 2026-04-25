@@ -82,10 +82,12 @@ function buildUpcomingView(today, todayStr) {
 
         // Check for activity on this date
         const activities = getDateActivities(dStr);
-        const hasActivity = activities.habits > 0 || activities.tasks > 0 || activities.goals > 0;
+        const isPastDate = new Date(dStr + 'T00:00:00') < new Date(todayStr + 'T00:00:00');
+        const showTaskDot = isPastDate ? activities.completedTasks > 0 : activities.tasks > 0;
+        const hasActivity = activities.habits > 0 || showTaskDot || activities.goals > 0;
 
         const dotHtml = hasActivity ? `<div class="flex gap-0.5 justify-center mt-1">
-            ${activities.tasks > 0 ? '<div style="width:4px;height:4px;border-radius:50%;background:var(--accent)"></div>' : ''}
+            ${showTaskDot ? `<div style="width:4px;height:4px;border-radius:50%;background:${isPastDate ? '#A855F7' : 'var(--accent)'}"></div>` : ''}
             ${activities.habits > 0 ? '<div style="width:4px;height:4px;border-radius:50%;background:var(--success)"></div>' : ''}
         </div>` : '<div style="height:9px"></div>';
 
@@ -376,10 +378,43 @@ function renderUpcomingTaskCard(task, isOverdue = false) {
     `;
 }
 
-function deleteTaskFromCalendar(taskId) {
-    if (typeof deleteTask === 'function') {
-        deleteTask(taskId);
-    }
+async function deleteTaskFromCalendar(taskId) {
+    const taskToDelete = appState.tasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+
+    const deletedTask = { ...taskToDelete };
+
+    // Optimistic removal from UI
+    appState.tasks = appState.tasks.filter(t => t.id !== taskId);
+    renderCalendar();
+
+    let deleteTimer = null;
+
+    showUndoToast('Task deleted', () => {
+        if (deleteTimer) clearTimeout(deleteTimer);
+        appState.tasks.push(deletedTask);
+        appState.tasks.sort((a, b) => (a.user_order || 0) - (b.user_order || 0));
+        renderCalendar();
+    });
+
+    deleteTimer = setTimeout(async () => {
+        try {
+            const deletedAt = new Date().toISOString();
+            const { error } = await supabaseClient
+                .from('tasks')
+                .update({ status: 'deleted', deleted_at: deletedAt })
+                .eq('id', taskId);
+            if (error) throw error;
+
+            deletedTask.status = 'deleted';
+            deletedTask.deleted_at = deletedAt;
+            appState.tasks.push(deletedTask);
+            if (typeof renderTasks === 'function') renderTasks();
+        } catch (error) {
+            console.error('Error deleting task from calendar:', error);
+            showToast('Failed to delete task', 'error');
+        }
+    }, 5000);
 }
 
 function getUpcomingDateLabel(dStr, todayStr, today) {
@@ -558,11 +593,22 @@ function jumpToToday() {
 // ============================================
 
 function getDateActivities(dateStr) {
-    const activities = { habits: 0, tasks: 0, goals: 0 };
+    const activities = { habits: 0, tasks: 0, completedTasks: 0, goals: 0 };
     activities.habits = appState.habitCompletions.filter(c => c.completion_date === dateStr).length;
+
+    // Active (due) tasks on this date
     activities.tasks = appState.tasks.filter(t =>
         t.status !== 'deleted' && t.due_date === dateStr && !t.is_completed
     ).length;
+
+    // Tasks completed on this date (by completed_at)
+    activities.completedTasks = appState.tasks.filter(t => {
+        if (t.status === 'deleted' || !t.is_completed || !t.completed_at) return false;
+        const cd = new Date(t.completed_at)
+            .toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+        return cd === dateStr;
+    }).length;
+
     activities.goals = appState.goals.filter(g => g.due_date === dateStr && g.status === 'active').length;
     return activities;
 }

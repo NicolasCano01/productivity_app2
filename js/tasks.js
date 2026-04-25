@@ -516,8 +516,16 @@ async function toggleTaskCompletion(taskId) {
     task.is_completed = !task.is_completed;
     task.completed_at = task.is_completed ? new Date().toISOString() : null;
     renderTasks();
-    
+
+    // Invalidate AI insights cache so next calendar load shows fresh data
+    if (typeof invalidateAIInsightsCache === 'function') invalidateAIInsightsCache();
+
     if (task.is_completed) {
+        // For recurring tasks: create the next occurrence
+        if (task.is_recurring) {
+            setTimeout(() => createNextRecurrence(task), 600);
+        }
+
         // Check if linked goal just reached 100%
         if (task.goal_id) {
             const linkedGoal = appState.goals.find(g => g.id === task.goal_id && g.status === 'active');
@@ -881,5 +889,99 @@ async function restoreTask(taskId) {
         task.deleted_at = previousDeletedAt;
         renderTasks();
         showToast('Failed to restore task', 'error');
+    }
+}
+
+// ============================================
+// RECURRING TASK — create next occurrence
+// ============================================
+async function createNextRecurrence(completedTask) {
+    if (!completedTask.is_recurring) return;
+
+    const {
+        recurrence_type,
+        recurrence_interval = 1,
+        recurrence_day_of_week,
+        recurrence_ends_on,
+        due_date
+    } = completedTask;
+
+    // Calculate next due date
+    let nextDate = null;
+    const base = due_date ? new Date(due_date + 'T00:00:00') : getMelbourneDate();
+    base.setHours(0, 0, 0, 0);
+
+    if (recurrence_type === 'daily') {
+        nextDate = new Date(base);
+        nextDate.setDate(base.getDate() + (recurrence_interval || 1));
+    } else if (recurrence_type === 'weekly') {
+        nextDate = new Date(base);
+        if (recurrence_day_of_week != null) {
+            // Find next occurrence of that weekday
+            const targetDay = recurrence_day_of_week; // 0=Sun...6=Sat
+            nextDate.setDate(base.getDate() + 1); // start from next day
+            while (nextDate.getDay() !== targetDay) {
+                nextDate.setDate(nextDate.getDate() + 1);
+            }
+        } else {
+            nextDate.setDate(base.getDate() + 7 * (recurrence_interval || 1));
+        }
+    } else if (recurrence_type === 'monthly') {
+        nextDate = new Date(base);
+        nextDate.setMonth(base.getMonth() + (recurrence_interval || 1));
+    }
+
+    if (!nextDate) return;
+
+    const nextDateStr = nextDate.getFullYear() + '-' +
+        String(nextDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(nextDate.getDate()).padStart(2, '0');
+
+    // Check recurrence end date
+    if (recurrence_ends_on && nextDateStr > recurrence_ends_on) {
+        console.log('🔁 Recurrence ended — no new task created');
+        return;
+    }
+
+    // Check no duplicate already exists for that date
+    const duplicate = appState.tasks.find(t =>
+        t.title === completedTask.title &&
+        t.due_date === nextDateStr &&
+        !t.is_completed &&
+        t.status !== 'deleted'
+    );
+    if (duplicate) return;
+
+    const maxOrder = Math.max(0, ...appState.tasks.map(t => t.user_order || 0));
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('tasks')
+            .insert({
+                title: completedTask.title,
+                notes: completedTask.notes,
+                category_id: completedTask.category_id,
+                goal_id: completedTask.goal_id,
+                due_date: nextDateStr,
+                is_completed: false,
+                is_recurring: true,
+                recurrence_type,
+                recurrence_interval,
+                recurrence_day_of_week,
+                recurrence_ends_on,
+                user_order: maxOrder + 1,
+                status: 'active'
+            })
+            .select(`*, category:categories(id,name,color_hex), goal:goals(id,name)`)
+            .single();
+
+        if (error) throw error;
+
+        appState.tasks.push(data);
+        renderTasks();
+        showToast(`🔁 Next "${completedTask.title}" scheduled for ${nextDateStr}`, 'success');
+        console.log('✅ Recurring task next instance created:', nextDateStr);
+    } catch (err) {
+        console.error('Error creating next recurrence:', err);
     }
 }

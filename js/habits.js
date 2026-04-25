@@ -184,6 +184,9 @@ async function toggleHabitCompletion(habitId, dateStr) {
 
     renderHabits();
 
+    // Invalidate AI insights so calendar reflects updated habit data
+    if (typeof invalidateAIInsightsCache === 'function') invalidateAIInsightsCache();
+
     // Persist to database
     try {
         if (isCompleted) {

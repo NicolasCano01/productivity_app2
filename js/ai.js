@@ -40,6 +40,15 @@ function saveAICacheToStorage() {
     }
 }
 
+// Call this whenever tasks or habits change so insights stay fresh
+function invalidateAIInsightsCache() {
+    aiCache.calendarInsights = null;
+    aiCache.calendarInsightsDate = null;
+    aiCache.panelInsights = null;
+    aiCache.panelInsightsDate = null;
+    saveAICacheToStorage();
+}
+
 // Chat history for AI panel
 let aiChatHistory = [];
 
@@ -175,7 +184,7 @@ function gatherAIData() {
     // Goals
     const activeGoals = appState.goals.filter(g => g.status === 'active');
     const goalsWithProgress = activeGoals.map(g => {
-        const linked = activeTasks.filter(t => t.goal_id === g.id);
+        const linked = activeTasks.filter(t => t.goal_id === g.id && t.status !== 'deleted');
         const completed = linked.filter(t => t.is_completed).length;
         return {
             name: g.name,
@@ -242,33 +251,34 @@ async function loadCalendarInsights() {
         </div>
     `;
 
-    // Check cache
-    if (aiCache.calendarInsights && aiCache.calendarInsightsDate === todayStr) {
-        renderCalendarInsights(container, aiCache.calendarInsights, aiCache.dailyQuote);
-        return;
-    }
-
-    // Gather data and call AI
+    // Gather data first (needed for both cache check and fresh fetch)
     const data = gatherAIData();
 
-    // Call insights and quote in parallel
-    const [insightsResult, quoteResult] = await Promise.all([
-        callAI('insights', data),
-        (aiCache.dailyQuote && aiCache.dailyQuoteDate === todayStr)
-            ? Promise.resolve(aiCache.dailyQuote)
-            : callAI('quote', { dayOfWeek: data.dayOfWeek, context: `${data.tasks.completedThisWeek} tasks done this week, ${data.tasks.overdue.length} overdue` })
+    // Insights are cached per day (expensive). Quote is always fresh (random + day-specific).
+    let insightsResult = null;
+    if (aiCache.calendarInsights && aiCache.calendarInsightsDate === todayStr) {
+        insightsResult = aiCache.calendarInsights;
+    }
+
+    // Always fetch a fresh quote so it varies across page loads
+    // Call insights (if not cached) and quote in parallel
+    const [freshInsights, quoteResult] = await Promise.all([
+        insightsResult
+            ? Promise.resolve(null)
+            : callAI('insights', data),
+        callAI('quote', {
+            dayOfWeek: data.dayOfWeek,
+            context: `${data.tasks.completedThisWeek} tasks done this week, ${data.habits.completionsThisWeek} habit completions, ${data.tasks.overdue.length} overdue`,
+            random: Math.random()  // ensures AI generates a different quote each call
+        })
     ]);
 
-    // Cache results and persist to localStorage
-    if (insightsResult) {
-        aiCache.calendarInsights = insightsResult;
+    if (freshInsights) {
+        insightsResult = freshInsights;
+        aiCache.calendarInsights = freshInsights;
         aiCache.calendarInsightsDate = todayStr;
+        saveAICacheToStorage();
     }
-    if (quoteResult && quoteResult.quote) {
-        aiCache.dailyQuote = quoteResult;
-        aiCache.dailyQuoteDate = todayStr;
-    }
-    saveAICacheToStorage();
 
     renderCalendarInsights(container, insightsResult, quoteResult);
 }
@@ -412,7 +422,19 @@ async function sendAIChat() {
     // Gather full data context
     const data = gatherFullDataForChat();
 
-    const systemPrompt = `You are a personal productivity assistant. The user's timezone is Melbourne, Australia. Today is ${getMelbourneDateString()}. Answer questions about their habits, tasks, goals, and productivity data. Be specific with dates and numbers. If asked about a specific habit or task, search through all the data to find matches.`;
+    const systemPrompt = `You are a personal productivity assistant. The user's timezone is Melbourne, Australia (AEST/AEDT). Today is ${getMelbourneDateString()} (${data.dayOfWeek}).
+
+Key data available:
+- completedTasksList: tasks sorted newest-first with completedDateMelbourne field
+- lastCompletedTask: the single most recently completed task
+- habitCompletionHistory: per-habit completion dates (last 30 days)
+- goals, habitsList: full lists
+
+Rules:
+- For "last completed task" always use lastCompletedTask field directly
+- For counts this week/month use tasks.completedThisWeek / tasks.completedThisMonth
+- Always mention specific task names, dates, and counts — never say "I don't have that data" if it's present
+- If completedTasksList is empty, say so honestly`;
 
     const result = await callAI('chat', data, aiChatHistory, systemPrompt);
 
@@ -541,38 +563,47 @@ async function loadAnalyticsAIChart() {
 }
 
 function gatherFullDataForChat() {
-    // Send more detailed data for chat context
     const data = gatherAIData();
 
-    // Add raw habit list with IDs for specific queries
-    data.habitsList = appState.habits.map(h => ({
-        name: h.name,
-        emoji: h.emoji,
-        frequency: h.frequency,
-        archived: h.archived
-    }));
+    // Habit list (non-archived)
+    data.habitsList = appState.habits
+        .filter(h => !h.archived)
+        .map(h => ({ name: h.name, emoji: h.emoji, frequency: h.frequency }));
 
-    // Add all completions summary (grouped by habit)
+    // Habit completions grouped by habit (last 30 days only to keep payload small)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+
     const completionsByHabit = {};
-    appState.habitCompletions.forEach(c => {
-        const habit = appState.habits.find(h => h.id === c.habit_id);
-        const name = habit ? habit.name : 'Unknown';
-        if (!completionsByHabit[name]) completionsByHabit[name] = [];
-        completionsByHabit[name].push(c.completion_date);
-    });
+    appState.habitCompletions
+        .filter(c => c.completion_date >= thirtyDaysAgoStr)
+        .forEach(c => {
+            const habit = appState.habits.find(h => h.id === c.habit_id);
+            const name = habit ? habit.name : 'Unknown';
+            if (!completionsByHabit[name]) completionsByHabit[name] = [];
+            completionsByHabit[name].push(c.completion_date);
+        });
     data.habitCompletionHistory = completionsByHabit;
 
-    // Add completed tasks with dates
-    data.completedTasksList = appState.tasks
-        .filter(t => t.is_completed && t.completed_at)
+    // Completed tasks — convert completed_at to Melbourne date string for clarity
+    const allCompleted = appState.tasks
+        .filter(t => t.status !== 'deleted' && t.is_completed && t.completed_at)
         .map(t => ({
             title: t.title,
             completedAt: t.completed_at,
-            category: t.category?.name,
-            goal: t.goal?.name
-        }));
+            completedDateMelbourne: new Date(t.completed_at)
+                .toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' }),
+            category: t.category?.name || null,
+            goal: t.goal?.name || null
+        }))
+        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
 
-    // Add goal completion info
+    // Keep last 50 completed tasks max to avoid payload size issues
+    data.completedTasksList = allCompleted.slice(0, 50);
+    data.lastCompletedTask = allCompleted[0] || null;
+
+    // Goals
     data.goalsList = appState.goals.map(g => ({
         name: g.name,
         status: g.status,

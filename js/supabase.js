@@ -188,6 +188,40 @@ async function fetchInitialData() {
 }
 
 // ============================================
+// SUPABASE KEEP-ALIVE (ping every 20 min)
+// ============================================
+let _keepAliveTimer = null;
+
+function startSupabaseKeepAlive() {
+    if (_keepAliveTimer) return; // already running
+    _keepAliveTimer = setInterval(async () => {
+        try {
+            // Lightweight read — just checks the connection is alive
+            const { error } = await supabaseClient
+                .from('categories')
+                .select('id')
+                .limit(1);
+            if (error) {
+                console.warn('⚠️ Keep-alive ping failed:', error.message);
+                updateConnectionStatus(false, error.message);
+            } else {
+                console.log('💓 Supabase keep-alive OK');
+                updateConnectionStatus(true);
+            }
+        } catch (err) {
+            console.warn('⚠️ Keep-alive error:', err.message);
+        }
+    }, 20 * 60 * 1000); // every 20 minutes
+}
+
+function stopSupabaseKeepAlive() {
+    if (_keepAliveTimer) {
+        clearInterval(_keepAliveTimer);
+        _keepAliveTimer = null;
+    }
+}
+
+// ============================================
 // SOFT-DELETE PURGE (30-day retention)
 // ============================================
 async function purgeSoftDeleted() {

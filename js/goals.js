@@ -5,7 +5,7 @@
 let draggedGoalId = null;
 
 function calculateGoalProgress(goalId) {
-    const linkedTasks = appState.tasks.filter(t => t.goal_id === goalId);
+    const linkedTasks = appState.tasks.filter(t => t.goal_id === goalId && t.status !== 'deleted');
     const totalTasks = linkedTasks.length;
     if (totalTasks === 0) return 0;
     const completedTasks = linkedTasks.filter(t => t.is_completed).length;
@@ -13,7 +13,7 @@ function calculateGoalProgress(goalId) {
 }
 
 function getGoalTaskCounts(goalId) {
-    const linkedTasks = appState.tasks.filter(t => t.goal_id === goalId);
+    const linkedTasks = appState.tasks.filter(t => t.goal_id === goalId && t.status !== 'deleted');
     const completed = linkedTasks.filter(t => t.is_completed).length;
     return { total: linkedTasks.length, completed: completed };
 }
@@ -213,7 +213,7 @@ function openGoalModal(goalId) {
             emojiDisplay.classList.add('no-emoji');
         }
         
-        const linkedTasks = appState.tasks.filter(t => t.goal_id === goal.id);
+        const linkedTasks = appState.tasks.filter(t => t.goal_id === goal.id && t.status !== 'deleted');
         const taskInfo = document.getElementById('goal-task-info');
         if (taskInfo) {
             if (linkedTasks.length > 0) {
