@@ -6,6 +6,9 @@
 const SUPABASE_URL = 'https://byowdkmuurbrvkuydhml.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5b3dka211dXJicnZrdXlkaG1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MDc5NzUsImV4cCI6MjA4MzM4Mzk3NX0.mcBSPRA-o-1WGd2t0jJ1jwONUUiJ9kf1dk55aJS9nJQ';
 
+// xAI (Grok) Configuration — get your free API key at https://console.x.ai
+const XAI_API_KEY = 'YOUR_XAI_API_KEY_HERE';
+
 // Emoji Categories (120+ emojis organized by category)
 const EMOJI_CATEGORIES = {
     'Popular': ['💪', '🏃', '📚', '🧘', '💤', '🥗', '💧', '🎯', '✅', '🔥', '⭐', '🌟', '💡', '⏰', '📅', '🏆'],

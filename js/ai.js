@@ -1,8 +1,9 @@
 // ============================================
-// PRODUCTIVITY HUB - AI MODULE
+// PRODUCTIVITY HUB - AI MODULE (powered by Grok / xAI)
 // ============================================
 
-const AI_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
+const XAI_API_URL = 'https://api.x.ai/v1/chat/completions';
+const XAI_MODEL = 'grok-3-mini';
 
 // Cache for daily quote and insights (avoid repeated API calls)
 // Persisted to localStorage so data survives page reloads within the same day
@@ -53,28 +54,90 @@ function invalidateAIInsightsCache() {
 let aiChatHistory = [];
 
 // ============================================
-// AI API CALL (through Supabase Edge Function)
+// AI API CALL (direct to xAI / Grok)
 // ============================================
 async function callAI(type, data = {}, messages = [], systemPrompt = '') {
+    if (!XAI_API_KEY || XAI_API_KEY === 'YOUR_XAI_API_KEY_HERE') {
+        console.warn('xAI API key not configured — set XAI_API_KEY in config.js');
+        return null;
+    }
+
     try {
-        const response = await fetch(AI_FUNCTION_URL, {
+        // Build the messages array and expected response format for each type
+        let grokMessages;
+        let expectJson = true;
+
+        if (type === 'insights') {
+            grokMessages = [
+                {
+                    role: 'system',
+                    content: 'You are a productivity analyst. Always respond with valid JSON only — no markdown, no explanation outside the JSON.'
+                },
+                {
+                    role: 'user',
+                    content: `Analyze this productivity data and return exactly this JSON shape:
+{"insights":["insight 1","insight 2","insight 3"],"chart":{"type":"bar","title":"...","labels":[...],"data":[...],"colors":["#007AFF","#34C759","#FF9500","#FF3B30","#AF52DE"]}}
+
+Rules:
+- insights: 3 specific, actionable sentences referencing real numbers from the data
+- chart: pick the most interesting metric (tasks per week, habits per day, goal progress, etc.)
+- chart.type: "bar", "line", or "doughnut"
+
+Data: ${JSON.stringify(data)}`
+                }
+            ];
+        } else if (type === 'quote') {
+            grokMessages = [
+                {
+                    role: 'system',
+                    content: 'You are a motivational writer. Always respond with valid JSON only.'
+                },
+                {
+                    role: 'user',
+                    content: `Generate a fresh, inspiring motivational quote for ${data.dayOfWeek}. Context: ${data.context}. Seed: ${data.random}.
+Return JSON: {"quote":"...","author":"..."} — use a real historical figure, philosopher, or athlete as author.`
+                }
+            ];
+        } else if (type === 'chat') {
+            expectJson = false;
+            grokMessages = [
+                { role: 'system', content: systemPrompt || 'You are a helpful productivity assistant.' },
+                ...messages
+            ];
+        } else {
+            return null;
+        }
+
+        const response = await fetch(XAI_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                'Authorization': `Bearer ${XAI_API_KEY}`
             },
-            body: JSON.stringify({ type, data, messages, systemPrompt })
+            body: JSON.stringify({
+                model: XAI_MODEL,
+                messages: grokMessages,
+                temperature: type === 'quote' ? 0.9 : 0.7
+            })
         });
 
         if (!response.ok) {
             const errText = await response.text();
-            console.error('AI proxy error:', response.status, errText);
+            console.error('xAI API error:', response.status, errText);
             return null;
         }
 
         const json = await response.json();
-        console.log('AI response for', type, ':', JSON.stringify(json).substring(0, 200));
-        return json;
+        const content = json.choices?.[0]?.message?.content || '';
+        console.log('Grok response for', type, ':', content.substring(0, 200));
+
+        if (!expectJson) {
+            return { response: content };
+        }
+
+        // Strip markdown code fences if Grok wraps the JSON
+        const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        return JSON.parse(cleaned);
     } catch (err) {
         console.error('AI call failed:', err);
         return null;
