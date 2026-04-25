@@ -433,6 +433,49 @@
                         <pre id="apps-script-code" style="font-size:10px;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:8px;padding:10px;margin-top:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-all"></pre>
                     </details>
                 </div>
+
+                <!-- Google Tasks sync section -->
+                <div class="mb-2" style="border-top:1px solid var(--border);padding-top:16px">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:4px">
+                        <i class="fas fa-check-square mr-1" style="color:#1A73E8"></i> Google Tasks Sync
+                    </h4>
+                    <p id="gt-status" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+                        <i class="fas fa-circle mr-1" style="opacity:0.4"></i> Not connected
+                    </p>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+                        Sync tasks that have due dates to a "Productivity Hub" list in Google Tasks.
+                        Requires a Google Cloud OAuth Client ID —
+                        <a href="#" onclick="showGoogleTasksSetup();return false" style="color:var(--accent);text-decoration:underline">How to set up →</a>
+                    </p>
+                    <button id="gt-connect-btn" onclick="googleTasksConnect()"
+                        class="w-full py-2.5 rounded-xl font-semibold text-sm mb-2"
+                        style="background:#1A73E8;color:#fff;border:none;cursor:pointer">
+                        <i class="fas fa-link mr-1"></i> Connect Google Tasks
+                    </button>
+                    <div id="gt-sync-btns" class="hidden">
+                        <button onclick="syncToGoogleTasks()"
+                            class="w-full py-2.5 rounded-xl font-semibold text-sm mb-2"
+                            style="background:#1A73E8;color:#fff;border:none;cursor:pointer">
+                            <i class="fas fa-sync mr-1"></i> Sync Tasks to Google Tasks
+                        </button>
+                        <button onclick="googleTasksDisconnect()"
+                            class="w-full py-2 rounded-xl font-semibold text-sm"
+                            style="background:var(--bg-secondary);color:var(--danger);border:1px solid var(--border);cursor:pointer">
+                            <i class="fas fa-unlink mr-1"></i> Disconnect
+                        </button>
+                    </div>
+                    <div id="gt-setup-instructions" class="hidden mt-3 rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
+                        <p style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Setup (one-time):</p>
+                        <ol style="font-size:11px;color:var(--text-secondary);line-height:1.8;padding-left:14px">
+                            <li>Go to <strong>console.cloud.google.com</strong> and create a project</li>
+                            <li>Enable the <strong>Google Tasks API</strong></li>
+                            <li>Go to APIs &amp; Services → Credentials → Create Credentials → OAuth Client ID</li>
+                            <li>Application type: <strong>Web application</strong></li>
+                            <li>Add your site URL to Authorized JavaScript origins AND Authorized redirect URIs, append <code>/oauth-callback.html</code> to the redirect URI</li>
+                            <li>Copy the Client ID into <code>config.js</code> as <strong>GOOGLE_CLIENT_ID</strong></li>
+                        </ol>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -852,6 +895,7 @@
     <script src="js/ai.js"></script>
     <script src="js/corkboard.js"></script>
     <script src="js/backup.js"></script>
+    <script src="js/google-tasks.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Connecting...</title></head>
+<body>
+<script>
+// Parse OAuth implicit-flow token from URL hash and send to opener
+const params = new URLSearchParams(window.location.hash.slice(1));
+const token = params.get('access_token');
+const expiresIn = params.get('expires_in');
+const error = params.get('error');
+
+if (window.opener) {
+    if (token) {
+        window.opener.postMessage({ googleAccessToken: token, expiresIn }, window.location.origin);
+    } else {
+        window.opener.postMessage({ googleTasksError: error || 'auth_failed' }, window.location.origin);
+    }
+    window.close();
+} else {
+    document.body.innerHTML = '<p>Authentication complete. You can close this window.</p>';
+}
+</script>
+</body>
+</html>

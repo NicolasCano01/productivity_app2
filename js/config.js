@@ -9,6 +9,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // xAI (Grok) Configuration — get your free API key at https://console.x.ai
 const XAI_API_KEY = 'YOUR_XAI_API_KEY_HERE';
 
+// Google Tasks OAuth — get your Client ID at https://console.cloud.google.com
+// Application type: Web Application; add your site + /oauth-callback.html as redirect URI
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE';
+
 // Emoji Categories (120+ emojis organized by category)
 const EMOJI_CATEGORIES = {
     'Popular': ['💪', '🏃', '📚', '🧘', '💤', '🥗', '💧', '🎯', '✅', '🔥', '⭐', '🌟', '💡', '⏰', '📅', '🏆'],

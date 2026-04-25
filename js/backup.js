@@ -43,6 +43,7 @@ function openBackupModal() {
     if (urlInput) urlInput.value = savedUrl;
 
     updateBackupStatusBar();
+    if (typeof initGoogleTasksUI === 'function') initGoogleTasksUI();
     modal.classList.remove('hidden');
 }
 
