@@ -738,6 +738,54 @@ body.dark #login-modal input {
     flex: 1;
 }
 
+/* ---- Pinned card drag & drop states ---- */
+.pinned-task-card.dragging {
+    opacity: 0.45;
+    transform: scale(1.03);
+    box-shadow: var(--shadow-lg);
+    cursor: grabbing;
+}
+
+.pinned-task-card.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+    transform: scale(1.02);
+}
+
+/* ---- Pinned card checkbox ---- */
+.pinned-task-checkbox {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pinned-task-checkbox:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ---- Pinned card drag handle ---- */
+.pinned-drag-handle {
+    font-size: 10px;
+    color: var(--text-secondary);
+    opacity: 0.35;
+    cursor: grab;
+    padding: 4px 2px;
+}
+
+.pinned-drag-handle:active {
+    cursor: grabbing;
+}
+
 /* ---- AI Chat FAB (floating action button) ---- */
 .ai-chat-fab {
     position: fixed;

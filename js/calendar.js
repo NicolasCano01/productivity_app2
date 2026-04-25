@@ -118,8 +118,76 @@ function buildUpcomingView(today, todayStr) {
 }
 
 // ============================================
-// PINNED TASKS SECTION
+// PINNED TASKS SECTION — drag & drop + completion
 // ============================================
+
+let draggedPinnedId = null;
+
+function handlePinnedDragStart(event, taskId) {
+    draggedPinnedId = taskId;
+    event.currentTarget.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+}
+
+function handlePinnedDragEnd(event) {
+    event.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.pinned-task-card').forEach(card => {
+        card.classList.remove('drag-over');
+    });
+    draggedPinnedId = null;
+}
+
+function handlePinnedDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const draggedCard = document.querySelector('.pinned-task-card.dragging');
+    const currentCard = event.currentTarget;
+    if (draggedCard && currentCard !== draggedCard) {
+        currentCard.classList.add('drag-over');
+    }
+}
+
+function handlePinnedDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+}
+
+async function handlePinnedDrop(event, targetTaskId) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+
+    if (!draggedPinnedId || draggedPinnedId === targetTaskId) return;
+
+    const draggedIndex = appState.tasks.findIndex(t => t.id === draggedPinnedId);
+    const targetIndex = appState.tasks.findIndex(t => t.id === targetTaskId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const draggedTask = appState.tasks[draggedIndex];
+    appState.tasks.splice(draggedIndex, 1);
+    appState.tasks.splice(targetIndex, 0, draggedTask);
+
+    renderCalendar();
+    showToast('Reordering...', 'success');
+
+    try {
+        const updates = appState.tasks.map((task, index) => ({
+            id: task.id,
+            user_order: index + 1
+        }));
+        for (const update of updates) {
+            await supabaseClient
+                .from('tasks')
+                .update({ user_order: update.user_order })
+                .eq('id', update.id);
+        }
+    } catch (error) {
+        console.error('Error reordering pinned tasks:', error);
+        showToast('Failed to save order', 'error');
+        await fetchInitialData();
+        renderCalendar();
+    }
+}
+
 function buildPinnedTasksSection() {
     const pinned = appState.tasks.filter(t =>
         t.is_pinned && t.status !== 'deleted' && !t.is_completed
@@ -135,17 +203,31 @@ function buildPinnedTasksSection() {
             : false;
 
         return `
-        <div class="pinned-task-card" onclick="openTaskModal('${task.id}')">
+        <div class="pinned-task-card"
+            draggable="true"
+            ondragstart="handlePinnedDragStart(event, '${task.id}')"
+            ondragend="handlePinnedDragEnd(event)"
+            ondragover="handlePinnedDragOver(event)"
+            ondragleave="handlePinnedDragLeave(event)"
+            ondrop="handlePinnedDrop(event, '${task.id}')"
+            onclick="openTaskModal('${task.id}')">
             <div class="pinned-task-card-top">
                 <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                    <button onclick="event.stopPropagation();toggleTaskCompletion('${task.id}')"
+                        class="pinned-task-checkbox"
+                        title="Mark complete">
+                    </button>
                     <div style="width:7px;height:7px;border-radius:50%;background:${catColor};flex-shrink:0"></div>
                     <span style="font-size:10px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat ? escapeHtml(cat.name) : 'No category'}</span>
                 </div>
-                <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
-                    style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px"
-                    title="Unpin">
-                    <i class="fas fa-thumbtack"></i>
-                </button>
+                <div class="flex items-center gap-0.5">
+                    <i class="fas fa-grip-vertical pinned-drag-handle"></i>
+                    <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
+                        style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px"
+                        title="Unpin">
+                        <i class="fas fa-thumbtack"></i>
+                    </button>
+                </div>
             </div>
             <p class="pinned-task-card-title">${escapeHtml(task.title)}</p>
             ${due ? `<p style="font-size:10px;margin-top:auto;padding-top:6px;color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'}">
