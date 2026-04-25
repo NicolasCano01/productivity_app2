@@ -194,6 +194,8 @@ function closeModalOnBackdrop(event, modalId) {
             closeGoalModal();
         } else if (modalId === 'note-modal') {
             closeNoteModal();
+        } else if (modalId === 'backup-modal') {
+            closeBackupModal();
         }
     }
 }

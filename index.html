@@ -63,6 +63,9 @@
                 <button onclick="openCategoryModal()" class="text-gray-600 hover:text-primary transition" title="Manage Categories">
                     <i class="fas fa-folder text-xl"></i>
                 </button>
+                <button onclick="openBackupModal()" class="text-gray-600 hover:text-primary transition" title="Backup & Settings">
+                    <i class="fas fa-cloud-upload-alt text-xl"></i>
+                </button>
                 <div id="connection-status" class="flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-gray-300" id="status-dot"></div>
                     <span class="text-xs text-gray-500" id="status-text">Connecting...</span>
@@ -370,6 +373,68 @@
                 </button>
             </div>
         </nav>
+
+        <!-- Backup Modal -->
+        <div id="backup-modal" class="modal hidden" onclick="closeModalOnBackdrop(event,'backup-modal')">
+            <div class="modal-content p-5" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold" style="color:var(--text-primary)">Backup &amp; Data</h3>
+                    <button onclick="closeBackupModal()" style="color:var(--text-secondary);background:none;border:none;cursor:pointer;font-size:20px">&times;</button>
+                </div>
+
+                <!-- Last backup status -->
+                <div id="backup-status-bar" class="rounded-xl p-3 mb-4" style="background:var(--bg-secondary);border:1px solid var(--border)">
+                    <p id="backup-last-info" style="font-size:13px;color:var(--text-secondary)">No backup recorded yet</p>
+                </div>
+
+                <!-- Manual download -->
+                <div class="mb-5">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:8px">
+                        <i class="fas fa-download mr-1" style="color:var(--accent)"></i> Download Backup
+                    </h4>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Download all your tasks as a CSV file you can open in any spreadsheet app.</p>
+                    <button onclick="downloadTasksCSV()" class="w-full py-2.5 rounded-xl font-semibold text-sm transition"
+                        style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);cursor:pointer">
+                        <i class="fas fa-file-csv mr-1"></i> Download tasks.csv
+                    </button>
+                </div>
+
+                <!-- Google Sheets section -->
+                <div class="mb-5" style="border-top:1px solid var(--border);padding-top:16px">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:8px">
+                        <i class="fas fa-table mr-1" style="color:#34A853"></i> Google Sheets Backup
+                    </h4>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+                        Paste your Google Apps Script web app URL below. Tasks will be written to a "Tasks" sheet.
+                        <a id="backup-setup-link" href="#" onclick="showAppsScriptInstructions();return false"
+                            style="color:var(--accent);text-decoration:underline;cursor:pointer"> How to set up →</a>
+                    </p>
+                    <input id="sheets-url-input" type="url" placeholder="https://script.google.com/macros/s/..." class="w-full rounded-xl p-3 mb-3"
+                        style="border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;outline:none">
+                    <button onclick="backupToSheets()" class="w-full py-2.5 rounded-xl font-semibold text-sm transition"
+                        style="background:#34A853;color:#fff;border:none;cursor:pointer">
+                        <i class="fas fa-cloud-upload-alt mr-1"></i> Backup to Google Sheets Now
+                    </button>
+                </div>
+
+                <!-- Apps Script instructions -->
+                <div id="apps-script-instructions" class="hidden rounded-xl p-4 mb-4" style="background:var(--bg-secondary);border:1px solid var(--border)">
+                    <p style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Setup (one-time):</p>
+                    <ol style="font-size:12px;color:var(--text-secondary);line-height:1.8;padding-left:16px">
+                        <li>Open Google Sheets, create a new spreadsheet</li>
+                        <li>Go to Extensions → Apps Script</li>
+                        <li>Replace the code with the script below and click Save</li>
+                        <li>Click Deploy → New deployment → Web App</li>
+                        <li>Set "Execute as: Me" and "Who has access: Anyone"</li>
+                        <li>Copy the Web App URL and paste it above</li>
+                    </ol>
+                    <details class="mt-3">
+                        <summary style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer">Show Apps Script code</summary>
+                        <pre id="apps-script-code" style="font-size:10px;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:8px;padding:10px;margin-top:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-all"></pre>
+                    </details>
+                </div>
+            </div>
+        </div>
 
         <!-- AI Chat FAB (floating action button) — visible on Calendar & Analytics -->
         <button id="ai-chat-fab" class="ai-chat-fab hidden" onclick="openAIChatPopup()">
@@ -762,6 +827,7 @@
     <script src="js/analytics.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/corkboard.js"></script>
+    <script src="js/backup.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

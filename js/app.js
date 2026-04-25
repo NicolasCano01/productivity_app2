@@ -87,6 +87,9 @@ async function initApp() {
     // Step 6b: Start keep-alive ping so Supabase connection doesn't go idle
     startSupabaseKeepAlive();
 
+    // Step 6c: Auto-backup to Google Sheets if >24h since last backup
+    maybeAutoBackup();
+
     // Step 7: Show success message
     showToast('✨ All data loaded successfully!', 'success');
 
