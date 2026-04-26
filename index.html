@@ -83,22 +83,37 @@
             </div>
             
             <!-- PANEL 1: HABITS -->
-            <div id="habits-panel" class="panel hidden p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-2xl font-bold text-gray-800">Habits</h2>
-                    <button onclick="openHabitModal()" class="touch-target bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600 transition">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
+            <div id="habits-panel" class="panel hidden">
+                <!-- Two-column wrapper: list on left, detail on right (desktop only) -->
+                <div id="habits-panel-inner">
 
-                <!-- Date selector bar for logging past completions -->
-                <div id="habit-date-bar" class="mb-3"></div>
-
-                <div id="habits-list" class="space-y-2">
-                    <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-list-check text-4xl mb-2"></i>
-                        <p>Your habits will appear here</p>
+                    <!-- Left column: habit list -->
+                    <div id="habits-list-column">
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-2xl font-bold" style="color:var(--text-primary)">Habits</h2>
+                            <button onclick="openHabitModal()" class="touch-target bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600 transition">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <!-- Date selector bar for logging past completions -->
+                        <div id="habit-date-bar" class="mb-3"></div>
+                        <div id="habits-list" class="space-y-2">
+                            <div class="text-center text-gray-500 py-8">
+                                <i class="fas fa-list-check text-4xl mb-2"></i>
+                                <p>Your habits will appear here</p>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Right column: habit detail panel (desktop only) -->
+                    <div id="habit-detail-panel">
+                        <div id="habit-detail-placeholder">
+                            <i class="fas fa-hand-pointer"></i>
+                            <p>Select a habit to view insights</p>
+                        </div>
+                        <div id="habit-detail-content" class="hidden"></div>
+                    </div>
+
                 </div>
             </div>
             

@@ -2,10 +2,19 @@
 // PRODUCTIVITY HUB - HABITS PANEL
 // ============================================
 
-// Get habit streak from state
+// Detail panel state
+let selectedHabitId = null;
+const habitInsightCache = {};
+
+// Get habit streak count (backwards-compat helper)
 function getHabitStreak(habitId) {
     const streak = appState.habitStreaks.find(s => s.habit_id === habitId);
     return streak ? streak.current_streak : 0;
+}
+
+// Get full streak info object {current_streak, longest_streak}
+function getHabitStreakInfo(habitId) {
+    return appState.habitStreaks.find(s => s.habit_id === habitId) || { current_streak: 0, longest_streak: 0 };
 }
 
 // Check if habit is completed on a specific date (defaults to habitLogDate)
@@ -112,21 +121,22 @@ function renderHabits() {
         const isCompleted = isHabitCompletedOnDate(habit.id, habitLogDate);
         const streakClass = getStreakBadgeClass(streak);
         const emoji = habit.emoji || '';
-        
+        const isSelected = selectedHabitId === habit.id;
+
         let frequencyText = '';
         if (habit.frequency === 'daily') {
             frequencyText = 'Daily';
         } else if (habit.frequency === 'weekly') {
             frequencyText = `${habit.weekly_target_days || 3}x/week`;
         }
-        
+
         if (habit.exempt_weekends) {
             frequencyText += ' • No weekends';
         }
-        
+
         return `
-            <div 
-                class="habit-card" 
+            <div
+                class="habit-card${isSelected ? ' selected' : ''}"
                 draggable="true"
                 data-habit-id="${habit.id}"
                 ondragstart="handleDragStart(event, '${habit.id}')"
@@ -142,12 +152,12 @@ function renderHabits() {
                         class="habit-checkbox ${isCompleted ? 'checked' : ''}"
                         onclick="toggleHabitCompletion('${habit.id}', '${habitLogDate}')"
                     ></div>
-                    <div class="flex-1 min-w-0" onclick="openEditHabitModal('${habit.id}')">
-                        <h3 class="font-semibold text-gray-800 text-sm ${isCompleted ? 'line-through text-gray-400' : ''} truncate">
+                    <div class="flex-1 min-w-0" onclick="selectHabit('${habit.id}')">
+                        <h3 class="font-semibold text-sm ${isCompleted ? 'line-through text-gray-400' : ''} truncate" style="color:var(--text-primary)">
                             ${habit.name}
                         </h3>
                         <div class="flex items-center gap-2 mt-0.5">
-                            <span class="text-xs text-gray-500">
+                            <span class="text-xs" style="color:var(--text-secondary)">
                                 ${frequencyText}
                             </span>
                         </div>
@@ -211,6 +221,11 @@ async function toggleHabitCompletion(habitId, dateStr) {
 
         await refreshHabitStreaks();
         renderHabits();
+        // Refresh detail panel stats if this habit is currently selected
+        if (selectedHabitId === habitId) {
+            delete habitInsightCache[habitId]; // completions changed — invalidate insight cache
+            renderHabitDetailPanel(habitId);
+        }
 
     } catch (error) {
         console.error('Error toggling habit completion:', error);
@@ -545,4 +560,236 @@ async function deleteHabit() {
             console.error('Error soft-deleting habit:', error);
         }
     }, 5000);
+}
+
+// ============================================
+// HABIT DETAIL PANEL (desktop)
+// ============================================
+
+/**
+ * selectHabit — called when the habit name/row is clicked.
+ * On desktop (≥1024px) shows the detail panel.
+ * On mobile opens the edit modal (unchanged behaviour).
+ */
+function selectHabit(habitId) {
+    if (window.innerWidth < 1024) {
+        openEditHabitModal(habitId);
+        return;
+    }
+
+    selectedHabitId = habitId;
+
+    // Update selected highlight in the list without a full re-render
+    document.querySelectorAll('.habit-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.habitId === habitId);
+    });
+
+    renderHabitDetailPanel(habitId);
+}
+
+/**
+ * Renders the full detail view for a habit into #habit-detail-content.
+ */
+function renderHabitDetailPanel(habitId) {
+    const placeholder = document.getElementById('habit-detail-placeholder');
+    const content = document.getElementById('habit-detail-content');
+    if (!placeholder || !content) return;
+
+    const habit = appState.habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    placeholder.classList.add('hidden');
+    content.classList.remove('hidden');
+
+    const streakInfo = getHabitStreakInfo(habitId);
+    const todayStr = getMelbourneDateString();
+    const allCompletions = appState.habitCompletions.filter(c => c.habit_id === habitId);
+
+    // Build 28-day window (4 weeks) aligned to Mon–Sun weeks
+    const today = getMelbourneDate();
+    today.setHours(0, 0, 0, 0);
+    const dow = today.getDay(); // 0=Sun … 6=Sat
+    const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysSinceMonday);
+    const startDate = new Date(thisMonday);
+    startDate.setDate(thisMonday.getDate() - 21); // 3 weeks back → 4 weeks total
+
+    const days28 = [];
+    for (let i = 0; i < 28; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const dateStr = formatDateString(d);
+        days28.push({
+            dateStr,
+            future: dateStr > todayStr,
+            done: !( dateStr > todayStr ) && isHabitCompletedOnDate(habitId, dateStr)
+        });
+    }
+
+    const doneDays = days28.filter(d => !d.future && d.done).length;
+    const possibleDays = days28.filter(d => !d.future).length;
+    const rate = possibleDays > 0 ? Math.round((doneDays / possibleDays) * 100) : 0;
+
+    content.innerHTML = `
+        <div class="habit-detail-header">
+            <div class="habit-detail-emoji">${habit.emoji || '📋'}</div>
+            <div style="flex:1;min-width:0">
+                <h2 class="habit-detail-name">${escapeHtml(habit.name)}</h2>
+                <span class="habit-detail-freq">${habit.frequency || 'daily'}${habit.exempt_weekends ? ' · No weekends' : ''}</span>
+            </div>
+            <button onclick="openEditHabitModal('${habitId}')" class="habit-detail-edit-btn" title="Edit habit">
+                <i class="fas fa-pen"></i>
+            </button>
+        </div>
+
+        <div class="habit-stats-grid">
+            <div class="habit-stat-card">
+                <div class="habit-stat-value">${streakInfo.current_streak || 0}${(streakInfo.current_streak || 0) > 0 ? ' 🔥' : ''}</div>
+                <div class="habit-stat-label">Current Streak</div>
+            </div>
+            <div class="habit-stat-card">
+                <div class="habit-stat-value">${streakInfo.longest_streak || 0}</div>
+                <div class="habit-stat-label">Best Streak</div>
+            </div>
+            <div class="habit-stat-card">
+                <div class="habit-stat-value">${rate}%</div>
+                <div class="habit-stat-label">28-Day Rate</div>
+            </div>
+            <div class="habit-stat-card">
+                <div class="habit-stat-value">${allCompletions.length}</div>
+                <div class="habit-stat-label">All Time</div>
+            </div>
+        </div>
+
+        <div class="habit-heatmap-section">
+            <p class="habit-section-title">Last 4 Weeks</p>
+            ${renderHabitHeatmap(days28)}
+        </div>
+
+        <div class="habit-insight-section">
+            <div class="habit-insight-section-header">
+                <p class="habit-section-title" style="margin:0">AI Insight</p>
+                <button onclick="reloadHabitInsight('${habitId}')" class="habit-insight-refresh" title="Refresh insight">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
+            </div>
+            <div id="habit-insight-${habitId}" class="habit-insight-container">
+                <div class="flex items-center gap-2" style="color:var(--text-secondary)">
+                    <div class="spinner" style="width:16px;height:16px;border-width:2px"></div>
+                    <span style="font-size:13px">Analyzing your habit...</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load AI insight (uses cache if available)
+    loadHabitInsight(habitId, habit, rate, streakInfo, days28);
+}
+
+/**
+ * Renders the 4-week heatmap grid (Mon–Sun columns, 4 rows).
+ */
+function renderHabitHeatmap(days28) {
+    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    const labelsHtml = dayLabels.map(l =>
+        `<div class="heatmap-day-label">${l}</div>`
+    ).join('');
+
+    const cellsHtml = days28.map(day => {
+        let cls = 'heatmap-cell';
+        if (day.future) cls += ' heatmap-future';
+        else if (day.done) cls += ' heatmap-done';
+        else cls += ' heatmap-missed';
+        return `<div class="${cls}" title="${day.dateStr}${day.done ? ' ✓' : day.future ? '' : ' ✗'}"></div>`;
+    }).join('');
+
+    return `
+        <div>
+            <div class="heatmap-day-labels">${labelsHtml}</div>
+            <div class="heatmap-grid">${cellsHtml}</div>
+            <div class="heatmap-legend">
+                <span><span class="heatmap-legend-dot" style="background:var(--accent)"></span>Done</span>
+                <span><span class="heatmap-legend-dot" style="background:var(--bg-tertiary);border:1px solid var(--border)"></span>Missed</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Fetches (or returns cached) AI insight for a habit and renders it.
+ */
+async function loadHabitInsight(habitId, habit, rate, streakInfo, days28) {
+    const container = document.getElementById(`habit-insight-${habitId}`);
+    if (!container) return;
+
+    // Return cached result instantly
+    if (habitInsightCache[habitId]) {
+        renderHabitInsightResult(container, habitInsightCache[habitId]);
+        return;
+    }
+
+    // Build the 28-day pattern string (oldest→newest)
+    const recentDays = days28.map(d => d.future ? 'f' : (d.done ? '1' : '0')).join('');
+
+    const result = await callAI('habit_insight', {
+        habitName: habit.name,
+        completionRate: rate,
+        currentStreak: streakInfo.current_streak || 0,
+        longestStreak: streakInfo.longest_streak || 0,
+        recentDays
+    });
+
+    if (!container.isConnected) return; // panel may have changed while waiting
+
+    if (result && result.insight) {
+        habitInsightCache[habitId] = result;
+        renderHabitInsightResult(container, result);
+    } else {
+        container.innerHTML = `
+            <div style="color:var(--text-secondary);font-size:13px">
+                <i class="fas fa-circle-exclamation mr-2"></i>
+                AI insight unavailable — set the <code>XAI_API_KEY</code> secret in Supabase.
+            </div>`;
+    }
+}
+
+/**
+ * Renders the AI result object into the insight container.
+ */
+function renderHabitInsightResult(container, data) {
+    const trendMeta = {
+        improving:   { color: 'var(--success)', label: '↑ Improving' },
+        consistent:  { color: 'var(--accent)',  label: '● Consistent' },
+        declining:   { color: 'var(--error)',   label: '↓ Needs work' },
+        just_started:{ color: 'var(--warning)', label: '★ Just started' },
+    };
+    const meta = trendMeta[data.trend] || trendMeta.consistent;
+
+    container.innerHTML = `
+        <div class="habit-insight-card" style="width:100%">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-sparkles" style="color:${meta.color};font-size:12px"></i>
+                <span class="habit-insight-trend" style="color:${meta.color}">${meta.label}</span>
+            </div>
+            <p class="habit-insight-text">${escapeHtml(data.insight || '')}</p>
+            ${data.tip ? `
+                <div class="habit-insight-tip">
+                    <i class="fas fa-lightbulb" style="color:var(--warning);margin-top:1px;flex-shrink:0"></i>
+                    <span>${escapeHtml(data.tip)}</span>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+/**
+ * Clears the insight cache for a habit and re-renders the detail panel.
+ */
+function reloadHabitInsight(habitId) {
+    delete habitInsightCache[habitId];
+    if (selectedHabitId === habitId) {
+        renderHabitDetailPanel(habitId);
+    }
 }

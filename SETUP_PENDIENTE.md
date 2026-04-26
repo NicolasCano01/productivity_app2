@@ -15,7 +15,9 @@ Todo el código ya está deployado en GitHub Pages. Lo que queda son **configura
 
 ## 1. Grok AI
 
-> **Impacto:** Sin esto, el AI no funciona (insights, quotes, chat). Es el cambio más importante.
+> **Impacto:** Sin esto, el AI no funciona (insights, quotes, chat, habit insights). Es el cambio más importante.
+
+> **Seguridad:** Como el repositorio es público, la API key se guarda como **Supabase Secret** (nunca en el código). La app llama a un Edge Function que actúa de proxy — la key jamás queda expuesta.
 
 ### Cómo obtener la API key (gratis)
 
@@ -24,32 +26,25 @@ Todo el código ya está deployado en GitHub Pages. Lo que queda son **configura
 3. En el dashboard, ir a **API Keys** → **Create API Key**
 4. Copiar la key (empieza con `xai-...`)
 
-### Configurarlo en la app
+### Configurarlo en Supabase (no en el repo)
 
-Abrir el archivo:
-```
-js/config.js
-```
+1. Ir a **[supabase.com](https://supabase.com)** → iniciar sesión
+2. Abrir el proyecto **`byowdkmuurbrvkuydhml`**
+3. En el menú izquierdo → **Edge Functions**
+4. Click en la función **`ai-proxy`**
+5. Click en la pestaña **Secrets** (o buscar en la sidebar "Secrets")
+6. Click **"Add new secret"** (o el botón `+`)
+   - **Name:** `XAI_API_KEY`
+   - **Value:** `xai-TuKeyAqui...`
+7. Guardar
 
-Reemplazar esta línea:
-```javascript
-const XAI_API_KEY = 'YOUR_XAI_API_KEY_HERE';
-```
-Por:
-```javascript
-const XAI_API_KEY = 'xai-TuKeyAqui...';
-```
-
-Guardar → commit → push:
-```bash
-git add js/config.js
-git commit -m "Add xAI API key"
-git push origin main
-```
+No hay que hacer ningún commit — la key nunca está en el código ni en GitHub.
 
 ### Verificar que funciona
 
 Abrir la app → panel Calendar → esperar que aparezca la frase motivacional y los AI Insights. Si aparecen, está funcionando.
+
+También: ir al panel **Habits** → click en cualquier hábito → debería aparecer el "AI Insight" en el panel de la derecha (desktop).
 
 > **Nota sobre costos:** El modelo `grok-3-mini` tiene un free tier generoso. Con el uso normal de esta app (1-2 veces por día) no debería costar nada o muy poco.
 
