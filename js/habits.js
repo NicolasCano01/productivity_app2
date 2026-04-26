@@ -17,6 +17,27 @@ function getHabitStreakInfo(habitId) {
     return appState.habitStreaks.find(s => s.habit_id === habitId) || { current_streak: 0, longest_streak: 0 };
 }
 
+// Compute longest consecutive daily streak from local completion data
+function computeLongestStreak(habitId) {
+    const dates = appState.habitCompletions
+        .filter(c => c.habit_id === habitId)
+        .map(c => c.completion_date)
+        .sort(); // ascending YYYY-MM-DD strings
+
+    if (dates.length === 0) return 0;
+
+    let best = 1, run = 1;
+    for (let i = 1; i < dates.length; i++) {
+        if (dates[i] === dates[i - 1]) continue; // skip duplicate dates
+        const prev = new Date(dates[i - 1] + 'T00:00:00');
+        const curr = new Date(dates[i] + 'T00:00:00');
+        const diff = Math.round((curr - prev) / 86400000);
+        if (diff === 1) { run++; best = Math.max(best, run); }
+        else { run = 1; }
+    }
+    return best;
+}
+
 // Check if habit is completed on a specific date (defaults to habitLogDate)
 function isHabitCompletedOnDate(habitId, dateStr) {
     return appState.habitCompletions.some(c => c.habit_id === habitId && c.completion_date === dateStr);
@@ -602,6 +623,7 @@ function renderHabitDetailPanel(habitId) {
     content.style.display = 'block';
 
     const streakInfo = getHabitStreakInfo(habitId);
+    const longestStreak = computeLongestStreak(habitId);
     const todayStr = getMelbourneDateString();
     const allCompletions = appState.habitCompletions.filter(c => c.habit_id === habitId);
 
@@ -649,7 +671,7 @@ function renderHabitDetailPanel(habitId) {
                 <div class="habit-stat-label">Current Streak</div>
             </div>
             <div class="habit-stat-card">
-                <div class="habit-stat-value">${streakInfo.longest_streak || 0}</div>
+                <div class="habit-stat-value">${longestStreak}</div>
                 <div class="habit-stat-label">Best Streak</div>
             </div>
             <div class="habit-stat-card">
@@ -684,7 +706,7 @@ function renderHabitDetailPanel(habitId) {
     `;
 
     // Load AI insight (uses cache if available)
-    loadHabitInsight(habitId, habit, rate, streakInfo, days28);
+    loadHabitInsight(habitId, habit, rate, { current_streak: streakInfo.current_streak || 0, longest_streak: longestStreak }, days28);
 }
 
 /**

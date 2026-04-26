@@ -1488,8 +1488,8 @@ body.dark .habit-card.selected {
 
 .heatmap-day-labels {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(7, 30px);
+    gap: 5px;
     margin-bottom: 4px;
 }
 
@@ -1498,18 +1498,19 @@ body.dark .habit-card.selected {
     font-weight: 700;
     color: var(--text-secondary);
     text-align: center;
-    padding: 0 2px;
+    width: 30px;
 }
 
 .heatmap-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(7, 30px);
+    gap: 5px;
 }
 
 .heatmap-cell {
-    aspect-ratio: 1;
-    border-radius: 5px;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
     cursor: default;
     transition: transform 0.1s;
 }
