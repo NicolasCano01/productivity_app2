@@ -598,8 +598,8 @@ function renderHabitDetailPanel(habitId) {
     const habit = appState.habits.find(h => h.id === habitId);
     if (!habit) return;
 
-    placeholder.classList.add('hidden');
-    content.classList.remove('hidden');
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
 
     const streakInfo = getHabitStreakInfo(habitId);
     const todayStr = getMelbourneDateString();
