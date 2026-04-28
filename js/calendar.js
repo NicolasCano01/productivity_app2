@@ -168,7 +168,11 @@ async function handlePinnedDrop(event, targetTaskId) {
     appState.tasks.splice(draggedIndex, 1);
     appState.tasks.splice(targetIndex, 0, draggedTask);
 
-    renderCalendar();
+    if (currentPanel === 'board' && typeof renderBoard === 'function') {
+        renderBoard();
+    } else {
+        renderCalendar();
+    }
     showToast('Reordering...', 'success');
 
     try {
@@ -186,7 +190,11 @@ async function handlePinnedDrop(event, targetTaskId) {
         console.error('Error reordering pinned tasks:', error);
         showToast('Failed to save order', 'error');
         await fetchInitialData();
-        renderCalendar();
+        if (currentPanel === 'board' && typeof renderBoard === 'function') {
+            renderBoard();
+        } else {
+            renderCalendar();
+        }
     }
 }
 

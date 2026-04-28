@@ -2,9 +2,8 @@
 // PRODUCTIVITY HUB - TASKS PANEL (ENHANCED)
 // ============================================
 
-// Multi-category and objective state for the task modal
+// Multi-category state for the task modal
 let selectedCategoryIds = new Set();
-let editingObjectives = [];
 
 // Switch task view (All/Overdue/Upcoming/Completed/Deleted)
 function switchTaskView(view) {
@@ -414,12 +413,6 @@ function renderTaskCard(task, dateGroup = null) {
         metaParts.push(`<span class="${severity ? 'font-semibold' : ''}" style="color:${severity ? 'var(--danger)' : 'var(--text-secondary)'}">${dueDateText}</span>`);
     }
     if (task.is_recurring) metaParts.push(`<span style="color:var(--accent)"><i class="fas fa-repeat" style="font-size:9px"></i> Recurring</span>`);
-    // Objectives progress
-    const activeObjs = (task.objectives || []).filter(o => !o.isDeleted);
-    if (activeObjs.length > 0) {
-        const doneCt = activeObjs.filter(o => o.is_completed).length;
-        metaParts.push(`<span style="color:var(--text-secondary)"><i class="fas fa-list-check" style="font-size:9px"></i> ${doneCt}/${activeObjs.length}</span>`);
-    }
     if (isDeleted && task.deleted_at) {
         const deletedDate = new Date(task.deleted_at);
         const deletedText = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -672,9 +665,6 @@ function openTaskModal(taskId = null) {
             : (task.category_id ? [task.category_id] : []);
         selectedCategoryIds = new Set(cats);
 
-        // Populate objectives
-        editingObjectives = (task.objectives || []).map(o => ({ ...o }));
-
         if (task.is_recurring) {
             document.getElementById('recurring-options').classList.remove('hidden');
             document.getElementById('task-recurrence-type').value = task.recurrence_type || 'daily';
@@ -694,11 +684,9 @@ function openTaskModal(taskId = null) {
         document.getElementById('recurring-options').classList.add('hidden');
         deleteBtn.classList.add('hidden');
         selectedCategoryIds = new Set();
-        editingObjectives = [];
     }
 
     renderCategoryPicker();
-    renderObjectivesList();
     modal.classList.remove('hidden');
 }
 
@@ -802,41 +790,29 @@ async function saveTask(event) {
             showToast('Task created!', 'success');
         }
 
-        // Sync multi-categories (if migration has been run)
-        if (appState.hasMultiCategories && savedTaskId) {
-            await supabaseClient.from('task_categories').delete().eq('task_id', savedTaskId);
-            if (catIds.length > 0) {
-                await supabaseClient.from('task_categories').insert(
-                    catIds.map(cid => ({ task_id: savedTaskId, category_id: cid }))
-                );
-            }
-        }
+        // Sync multi-categories — always attempt regardless of hasMultiCategories flag
+        if (savedTaskId) {
+            try {
+                const { error: delErr } = await supabaseClient
+                    .from('task_categories')
+                    .delete()
+                    .eq('task_id', savedTaskId);
+                if (delErr) throw delErr;
 
-        // Sync objectives (if migration has been run)
-        if (appState.hasObjectives && savedTaskId) {
-            const toDelete = editingObjectives.filter(o => !o.isNew && o.isDeleted && o.id);
-            for (const obj of toDelete) {
-                await supabaseClient.from('task_objectives').delete().eq('id', obj.id);
-            }
-            const toUpdate = editingObjectives.filter(o => !o.isNew && !o.isDeleted && o.id);
-            for (const obj of toUpdate) {
-                await supabaseClient.from('task_objectives').update({ is_completed: obj.is_completed }).eq('id', obj.id);
-            }
-            const toInsert = editingObjectives.filter(o => o.isNew && !o.isDeleted);
-            if (toInsert.length > 0) {
-                await supabaseClient.from('task_objectives').insert(
-                    toInsert.map((obj, i) => ({
-                        task_id: savedTaskId,
-                        title: obj.title,
-                        is_completed: obj.is_completed,
-                        display_order: i
-                    }))
-                );
+                if (catIds.length > 0) {
+                    const { error: insErr } = await supabaseClient
+                        .from('task_categories')
+                        .insert(catIds.map(cid => ({ task_id: savedTaskId, category_id: cid })));
+                    if (insErr) throw insErr;
+                }
+                appState.hasMultiCategories = true;
+            } catch (catErr) {
+                console.warn('Multi-category save error (run migrations.sql if table missing):', catErr);
             }
         }
 
         // Reload relations for this task so appState reflects saved state
-        if (savedTaskId && (appState.hasMultiCategories || appState.hasObjectives)) {
+        if (savedTaskId && appState.hasMultiCategories) {
             await loadTaskRelations([savedTaskId]);
         }
 
@@ -998,73 +974,6 @@ function toggleCategorySelection(catId) {
         selectedCategoryIds.add(catId);
     }
     renderCategoryPicker();
-}
-
-// ============================================
-// OBJECTIVES (SUB-TASK CHECKLIST) HELPERS
-// ============================================
-function renderObjectivesList() {
-    const container = document.getElementById('task-objectives-list');
-    if (!container) return;
-
-    const progressEl = document.getElementById('objectives-progress-label');
-    const active = editingObjectives.filter(o => !o.isDeleted);
-    const done = active.filter(o => o.is_completed).length;
-    if (progressEl) progressEl.textContent = active.length > 0 ? `${done}/${active.length} done` : '';
-
-    if (active.length === 0) {
-        container.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);padding:2px 0">No objectives yet</p>';
-        return;
-    }
-
-    container.innerHTML = active.map((obj, i) => `
-        <div class="flex items-center gap-2" style="padding:4px 0;border-bottom:1px solid var(--border)">
-            <input type="checkbox" ${obj.is_completed ? 'checked' : ''}
-                onchange="toggleObjectiveItem(${i})"
-                style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);flex-shrink:0">
-            <span style="flex:1;font-size:13px;color:var(--text-primary);${obj.is_completed ? 'text-decoration:line-through;opacity:0.5' : ''}">${escapeHtml(obj.title)}</span>
-            <button type="button" onclick="removeObjectiveItem(${i})"
-                style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:11px;padding:2px 4px;opacity:0.5"
-                title="Remove">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `).join('');
-}
-
-function addObjectiveItem() {
-    const input = document.getElementById('new-objective-input');
-    if (!input) return;
-    const title = input.value.trim();
-    if (!title) return;
-    editingObjectives.push({
-        id: null, task_id: editingTaskId, title,
-        is_completed: false,
-        display_order: editingObjectives.filter(o => !o.isDeleted).length,
-        isNew: true
-    });
-    input.value = '';
-    renderObjectivesList();
-}
-
-function toggleObjectiveItem(index) {
-    const active = editingObjectives.filter(o => !o.isDeleted);
-    if (active[index]) {
-        active[index].is_completed = !active[index].is_completed;
-        renderObjectivesList();
-    }
-}
-
-function removeObjectiveItem(index) {
-    const active = editingObjectives.filter(o => !o.isDeleted);
-    const obj = active[index];
-    if (!obj) return;
-    if (obj.isNew) {
-        editingObjectives.splice(editingObjectives.indexOf(obj), 1);
-    } else {
-        obj.isDeleted = true;
-    }
-    renderObjectivesList();
 }
 
 // ============================================

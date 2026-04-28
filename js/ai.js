@@ -5,8 +5,8 @@
 // AI calls go through the Supabase Edge Function so the xAI key never lives in the repo
 const AI_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
 
-// Cache for daily quote and insights (avoid repeated API calls)
-// Persisted to localStorage so data survives page reloads within the same day
+// Cache for daily insights and quote (avoid repeated API calls)
+// Persisted to localStorage (and optionally Supabase DB) per day
 let aiCache = loadAICacheFromStorage();
 
 function loadAICacheFromStorage() {
@@ -15,8 +15,7 @@ function loadAICacheFromStorage() {
         if (stored) {
             const parsed = JSON.parse(stored);
             const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
-            // Only use cache if it's from today
-            if (parsed.calendarInsightsDate === todayStr || parsed.dailyQuoteDate === todayStr) {
+            if (parsed.date === todayStr) {
                 return parsed;
             }
         }
@@ -24,10 +23,12 @@ function loadAICacheFromStorage() {
         console.warn('Failed to load AI cache from localStorage:', e);
     }
     return {
-        dailyQuote: null,
-        dailyQuoteDate: null,
+        date: null,
         calendarInsights: null,
         calendarInsightsDate: null,
+        dailyQuote: null,
+        dailyQuoteAuthor: null,
+        dailyQuoteDate: null,
         panelInsights: null,
         panelInsightsDate: null
     };
@@ -35,9 +36,48 @@ function loadAICacheFromStorage() {
 
 function saveAICacheToStorage() {
     try {
+        aiCache.date = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
         localStorage.setItem('aiCache', JSON.stringify(aiCache));
     } catch (e) {
         console.warn('Failed to save AI cache to localStorage:', e);
+    }
+}
+
+// Save insights to Supabase DB for cross-device persistence
+async function saveInsightsToDB(todayStr, insights, quote, quoteAuthor, chart) {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+        await supabaseClient.from('daily_ai_insights').upsert({
+            user_id: session.user.id,
+            insight_date: todayStr,
+            insights: insights || [],
+            quote: quote || null,
+            quote_author: quoteAuthor || null,
+            chart_data: chart || null
+        }, { onConflict: 'user_id,insight_date' });
+    } catch (e) {
+        console.warn('Could not persist AI insights to DB (run migrations.sql):', e);
+    }
+}
+
+// Load insights from Supabase DB
+async function loadInsightsFromDB(todayStr) {
+    if (!supabaseClient) return null;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return null;
+        const { data, error } = await supabaseClient
+            .from('daily_ai_insights')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .eq('insight_date', todayStr)
+            .maybeSingle();
+        if (error || !data) return null;
+        return data;
+    } catch (e) {
+        return null;
     }
 }
 
@@ -45,6 +85,9 @@ function saveAICacheToStorage() {
 function invalidateAIInsightsCache() {
     aiCache.calendarInsights = null;
     aiCache.calendarInsightsDate = null;
+    aiCache.dailyQuote = null;
+    aiCache.dailyQuoteAuthor = null;
+    aiCache.dailyQuoteDate = null;
     aiCache.panelInsights = null;
     aiCache.panelInsightsDate = null;
     saveAICacheToStorage();
@@ -221,6 +264,46 @@ function gatherAIData() {
     };
 }
 
+// Build a system prompt for the 'insights' call that includes pending task context
+// and asks the AI to include task suggestions.
+function buildInsightsSystemPrompt(data) {
+    const today = getMelbourneDateString();
+    const pendingTasks = (appState.tasks || [])
+        .filter(t => t.status !== 'deleted' && !t.is_completed)
+        .map(t => {
+            const cats = (t.extraCategories && t.extraCategories.length > 0)
+                ? t.extraCategories.map(c => c.name).join(', ')
+                : (t.category?.name || null);
+            const daysUntilDue = t.due_date
+                ? Math.round((new Date(t.due_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000)
+                : null;
+            const urgency = daysUntilDue === null ? 'no date'
+                : daysUntilDue < 0 ? `OVERDUE ${Math.abs(daysUntilDue)}d`
+                : daysUntilDue === 0 ? 'due TODAY'
+                : `due in ${daysUntilDue}d`;
+            return `"${t.title}" [${urgency}]${cats ? ' {' + cats + '}' : ''}${t.goal ? ' (goal: ' + t.goal.name + ')' : ''}`;
+        })
+        .slice(0, 30) // cap at 30 to avoid huge payloads
+        .join('\n  ');
+
+    return `You are an AI productivity coach. The user is in Melbourne, Australia. Today is ${today} (${data.dayOfWeek}).
+Analyze their productivity data and respond with a JSON object with these fields:
+- "insights": array of 2-3 short motivational insight strings about habits/tasks/progress
+- "taskSuggestions": array of 2-3 actionable strings recommending which tasks to focus on (based on urgency, overdue status, goal alignment)
+- "chart": optional chart config object (type, labels, data, colors, title)
+
+Pending tasks (use these for taskSuggestions):
+  ${pendingTasks || 'No pending tasks'}
+
+Productivity summary:
+- Completed this week: ${data.tasks.completedThisWeek}, last week: ${data.tasks.completedLastWeek}
+- Overdue: ${data.tasks.overdue.length}
+- Habits today: ${data.habits.completedToday}/${data.habits.total}
+- Goals: ${(data.goals || []).map(g => g.name + ' ' + g.progress + '%').join(', ') || 'none'}
+
+Keep each insight/suggestion under 20 words. Be specific and actionable.`;
+}
+
 function formatWeekDate(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -231,7 +314,7 @@ function formatWeekDate(d) {
 // ============================================
 // CALENDAR INSIGHTS (1-2 sentences + quote)
 // ============================================
-async function loadCalendarInsights() {
+async function loadCalendarInsights(forceRefresh = false) {
     const container = document.getElementById('calendar-ai-insights');
     if (!container) return;
 
@@ -251,25 +334,47 @@ async function loadCalendarInsights() {
         </div>
     `;
 
-    // Gather data first (needed for both cache check and fresh fetch)
+    // Gather data (needed for fresh fetch)
     const data = gatherAIData();
 
-    // Insights are cached per day (expensive). Quote is always fresh (random + day-specific).
     let insightsResult = null;
-    if (aiCache.calendarInsights && aiCache.calendarInsightsDate === todayStr) {
-        insightsResult = aiCache.calendarInsights;
+    let quoteResult = null;
+
+    if (!forceRefresh) {
+        // 1. Try localStorage cache
+        if (aiCache.calendarInsights && aiCache.calendarInsightsDate === todayStr) {
+            insightsResult = aiCache.calendarInsights;
+        }
+        if (aiCache.dailyQuote && aiCache.dailyQuoteDate === todayStr) {
+            quoteResult = { quote: aiCache.dailyQuote, author: aiCache.dailyQuoteAuthor };
+        }
+
+        // 2. Try DB cache if localStorage missed
+        if (!insightsResult || !quoteResult) {
+            const dbRow = await loadInsightsFromDB(todayStr);
+            if (dbRow) {
+                if (!insightsResult && dbRow.insights?.length) {
+                    insightsResult = { insights: dbRow.insights, chart: dbRow.chart_data };
+                    aiCache.calendarInsights = insightsResult;
+                    aiCache.calendarInsightsDate = todayStr;
+                }
+                if (!quoteResult && dbRow.quote) {
+                    quoteResult = { quote: dbRow.quote, author: dbRow.quote_author };
+                    aiCache.dailyQuote = dbRow.quote;
+                    aiCache.dailyQuoteAuthor = dbRow.quote_author;
+                    aiCache.dailyQuoteDate = todayStr;
+                }
+                saveAICacheToStorage();
+            }
+        }
     }
 
-    // Always fetch a fresh quote so it varies across page loads
-    // Call insights (if not cached) and quote in parallel
-    const [freshInsights, quoteResult] = await Promise.all([
-        insightsResult
-            ? Promise.resolve(null)
-            : callAI('insights', data),
-        callAI('quote', {
+    // 3. Fetch whatever is still missing
+    const [freshInsights, freshQuote] = await Promise.all([
+        insightsResult ? Promise.resolve(null) : callAI('insights', data, [], buildInsightsSystemPrompt(data)),
+        quoteResult ? Promise.resolve(null) : callAI('quote', {
             dayOfWeek: data.dayOfWeek,
-            context: `${data.tasks.completedThisWeek} tasks done this week, ${data.habits.completionsThisWeek} habit completions, ${data.tasks.overdue.length} overdue`,
-            random: Math.random()  // ensures AI generates a different quote each call
+            context: `${data.tasks.completedThisWeek} tasks done this week, ${data.habits.completionsThisWeek} habit completions, ${data.tasks.overdue.length} overdue`
         })
     ]);
 
@@ -277,16 +382,46 @@ async function loadCalendarInsights() {
         insightsResult = freshInsights;
         aiCache.calendarInsights = freshInsights;
         aiCache.calendarInsightsDate = todayStr;
+    }
+    if (freshQuote) {
+        quoteResult = freshQuote;
+        aiCache.dailyQuote = freshQuote.quote || null;
+        aiCache.dailyQuoteAuthor = freshQuote.author || null;
+        aiCache.dailyQuoteDate = todayStr;
+    }
+
+    if (freshInsights || freshQuote) {
         saveAICacheToStorage();
+        // Persist to DB asynchronously
+        saveInsightsToDB(
+            todayStr,
+            insightsResult?.insights,
+            quoteResult?.quote,
+            quoteResult?.author,
+            insightsResult?.chart
+        );
     }
 
     renderCalendarInsights(container, insightsResult, quoteResult);
 }
 
+function refreshCalendarInsights() {
+    invalidateAIInsightsCache();
+    loadCalendarInsights(true);
+}
+
 function renderCalendarInsights(container, insights, quote) {
     const insightLines = insights?.insights || [];
+    const taskSuggestions = insights?.taskSuggestions || [];
     const quoteText = quote?.quote || '';
     const quoteAuthor = quote?.author || '';
+
+    const refreshBtn = `
+        <button onclick="refreshCalendarInsights()" title="Refresh AI insights"
+            style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:11px;padding:2px 4px;opacity:0.6;transition:opacity 0.15s"
+            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+            <i class="fas fa-rotate-right"></i>
+        </button>`;
 
     let html = '';
 
@@ -296,7 +431,7 @@ function renderCalendarInsights(container, insights, quote) {
             <div class="rounded-xl p-3 mb-3" style="background:linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));border:1px solid var(--border)">
                 <div class="flex items-start gap-2">
                     <i class="fas fa-quote-left" style="color:var(--accent);opacity:0.5;font-size:14px;margin-top:2px"></i>
-                    <div>
+                    <div style="flex:1;min-width:0">
                         <p style="font-size:13px;color:var(--text-primary);font-style:italic;line-height:1.4;margin-bottom:4px">${escapeHtml(quoteText)}</p>
                         ${quoteAuthor ? `<p style="font-size:11px;color:var(--text-secondary);font-weight:600">— ${escapeHtml(quoteAuthor)}</p>` : ''}
                     </div>
@@ -305,17 +440,34 @@ function renderCalendarInsights(container, insights, quote) {
         `;
     }
 
-    // AI Text Insights BELOW the quote
-    if (insightLines.length > 0) {
+    // AI Text Insights
+    if (insightLines.length > 0 || taskSuggestions.length > 0) {
         html += `
             <div class="rounded-xl p-3 mb-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-sparkles" style="color:var(--accent)"></i>
-                    <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">AI INSIGHTS</span>
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-sparkles" style="color:var(--accent)"></i>
+                        <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">AI INSIGHTS</span>
+                    </div>
+                    ${refreshBtn}
                 </div>
                 ${insightLines.map(line => `
                     <p style="font-size:13px;color:var(--text-primary);margin-bottom:4px;line-height:1.4">${escapeHtml(line)}</p>
                 `).join('')}
+                ${taskSuggestions.length > 0 ? `
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+                        <div class="flex items-center gap-1.5 mb-2">
+                            <i class="fas fa-bullseye" style="color:var(--accent);font-size:11px"></i>
+                            <span style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.3px">Focus Today</span>
+                        </div>
+                        ${taskSuggestions.map(s => `
+                            <div class="flex items-start gap-2 mb-1.5">
+                                <i class="fas fa-arrow-right" style="color:var(--accent);font-size:10px;margin-top:3px;flex-shrink:0"></i>
+                                <p style="font-size:13px;color:var(--text-primary);line-height:1.4;margin:0">${escapeHtml(s)}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -324,9 +476,12 @@ function renderCalendarInsights(container, insights, quote) {
     if (!html) {
         html = `
             <div class="rounded-xl p-3 mb-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-sparkles" style="color:var(--text-secondary)"></i>
-                    <span style="font-size:13px;color:var(--text-secondary)">AI insights unavailable — check your API key setup</span>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-sparkles" style="color:var(--text-secondary)"></i>
+                        <span style="font-size:13px;color:var(--text-secondary)">AI insights unavailable</span>
+                    </div>
+                    ${refreshBtn}
                 </div>
             </div>
         `;
@@ -421,19 +576,27 @@ async function sendAIChat() {
 
     // Gather full data context
     const data = gatherFullDataForChat();
+    const lastTask = data.lastCompletedTask;
+    const recentCompleted = (data.completedTasksList || []).slice(0, 5)
+        .map(t => `"${t.title}" on ${t.completedDateMelbourne}${t.category ? ' [' + t.category + ']' : ''}`).join('; ');
 
     const systemPrompt = `You are a personal productivity assistant. The user's timezone is Melbourne, Australia (AEST/AEDT). Today is ${getMelbourneDateString()} (${data.dayOfWeek}).
 
-Key data available:
-- completedTasksList: tasks sorted newest-first with completedDateMelbourne field
-- lastCompletedTask: the single most recently completed task
-- habitCompletionHistory: per-habit completion dates (last 30 days)
-- goals, habitsList: full lists
+KEY FACTS (use these directly in your answers):
+- Last completed task: ${lastTask ? `"${lastTask.title}" completed on ${lastTask.completedDateMelbourne}${lastTask.category ? ' (category: ' + lastTask.category + ')' : ''}${lastTask.goal ? ' (goal: ' + lastTask.goal + ')' : ''}` : 'No tasks completed yet'}
+- Tasks completed this week: ${data.tasks?.completedThisWeek ?? 0}
+- Tasks completed this month: ${data.tasks?.completedThisMonth ?? 0}
+- Overdue tasks: ${data.tasks?.overdue?.length ?? 0}${data.tasks?.overdue?.length ? ' — ' + data.tasks.overdue.map(t => '"' + t.title + '"').join(', ') : ''}
+- Recent 5 completed: ${recentCompleted || 'none'}
+- Active habits today: ${data.habits?.completedToday ?? 0}/${data.habits?.total ?? 0} done
+- Active goals: ${(data.goals || []).map(g => `"${g.name}" ${g.progress}%`).join(', ') || 'none'}
+
+Full context JSON for detailed queries: ${JSON.stringify(data)}
 
 Rules:
-- For "last completed task" always use lastCompletedTask field directly
-- For counts this week/month use tasks.completedThisWeek / tasks.completedThisMonth
-- Always mention specific task names, dates, and counts — never say "I don't have that data" if it's present
+- Answer directly using the KEY FACTS above
+- For "last completed task" use the Last completed task field above
+- Never say "I don't have that data" if it appears in KEY FACTS or the JSON
 - If completedTasksList is empty, say so honestly`;
 
     const result = await callAI('chat', data, aiChatHistory, systemPrompt);
@@ -467,7 +630,7 @@ function formatAIResponse(text) {
 // ============================================
 let analyticsAIChart = null;
 
-async function loadAnalyticsAIChart() {
+async function loadAnalyticsAIChart(forceRefresh = false) {
     const section = document.getElementById('analytics-ai-chart-section');
     const textContainer = document.getElementById('analytics-ai-insights-text');
     const ctx = document.getElementById('analytics-ai-chart');
@@ -475,15 +638,30 @@ async function loadAnalyticsAIChart() {
 
     const todayStr = getMelbourneDateString();
 
-    // Use cached insights if available from same day
-    let result = aiCache.calendarInsights;
-    if (!result || aiCache.calendarInsightsDate !== todayStr) {
+    let result = null;
+    if (!forceRefresh) {
+        if (aiCache.calendarInsights && aiCache.calendarInsightsDate === todayStr) {
+            result = aiCache.calendarInsights;
+        }
+        if (!result) {
+            const dbRow = await loadInsightsFromDB(todayStr);
+            if (dbRow?.insights?.length) {
+                result = { insights: dbRow.insights, chart: dbRow.chart_data };
+                aiCache.calendarInsights = result;
+                aiCache.calendarInsightsDate = todayStr;
+                saveAICacheToStorage();
+            }
+        }
+    }
+
+    if (!result) {
         const data = gatherAIData();
-        result = await callAI('insights', data);
+        result = await callAI('insights', data, [], buildInsightsSystemPrompt(data));
         if (result) {
             aiCache.calendarInsights = result;
             aiCache.calendarInsightsDate = todayStr;
             saveAICacheToStorage();
+            saveInsightsToDB(todayStr, result.insights, aiCache.dailyQuote, aiCache.dailyQuoteAuthor, result.chart);
         }
     }
 
@@ -494,18 +672,43 @@ async function loadAnalyticsAIChart() {
 
     section.style.display = 'block';
 
-    // Render insight text as compact cards (max 2)
+    // Render insight text as compact cards (max 2) + refresh button
     if (textContainer && result.insights) {
         const icons = ['lightbulb', 'chart-bar', 'bolt', 'bullseye', 'fire'];
         const colors = ['var(--warning)', 'var(--accent)', '#FF9500', '#34C759', '#FF3B30'];
-        textContainer.innerHTML = result.insights.slice(0, 2).map((insight, i) => `
-            <div class="rounded-lg p-2.5 mb-2" style="background:var(--bg-tertiary);border:1px solid var(--border)">
-                <div class="flex items-start gap-2">
-                    <i class="fas fa-${icons[i % icons.length]} mt-0.5" style="color:${colors[i % colors.length]};font-size:13px;flex-shrink:0"></i>
-                    <p style="font-size:12px;color:var(--text-primary);line-height:1.4">${escapeHtml(insight)}</p>
-                </div>
+        const taskSugg = result.taskSuggestions || [];
+        textContainer.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+                <span style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.3px">AI Insights</span>
+                <button onclick="loadAnalyticsAIChart(true)" title="Refresh insights"
+                    style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:11px;padding:2px 4px;opacity:0.6"
+                    onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
             </div>
-        `).join('');
+            ${result.insights.slice(0, 2).map((insight, i) => `
+                <div class="rounded-lg p-2.5 mb-2" style="background:var(--bg-tertiary);border:1px solid var(--border)">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-${icons[i % icons.length]} mt-0.5" style="color:${colors[i % colors.length]};font-size:13px;flex-shrink:0"></i>
+                        <p style="font-size:12px;color:var(--text-primary);line-height:1.4">${escapeHtml(insight)}</p>
+                    </div>
+                </div>
+            `).join('')}
+            ${taskSugg.length > 0 ? `
+                <div class="rounded-lg p-2.5 mb-2" style="background:var(--bg-tertiary);border:1px solid var(--border)">
+                    <div class="flex items-center gap-1.5 mb-1.5">
+                        <i class="fas fa-bullseye" style="color:var(--accent);font-size:11px"></i>
+                        <span style="font-size:11px;font-weight:600;color:var(--text-secondary)">Focus Today</span>
+                    </div>
+                    ${taskSugg.slice(0, 2).map(s => `
+                        <div class="flex items-start gap-1.5 mb-1">
+                            <i class="fas fa-arrow-right" style="color:var(--accent);font-size:9px;margin-top:3px;flex-shrink:0"></i>
+                            <p style="font-size:12px;color:var(--text-primary);line-height:1.4;margin:0">${escapeHtml(s)}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
     }
 
     // Render chart

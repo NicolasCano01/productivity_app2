@@ -98,25 +98,37 @@ function renderBoardPinned() {
             : false;
 
         return `
-            <div class="note-card pinned-note" style="background:var(--bg-secondary);border:1px solid var(--border)"
-                onclick="openTaskModal('${task.id}')">
-                <div class="note-card-body">
-                    <div class="flex items-center gap-1.5 mb-1">
-                        <div style="width:7px;height:7px;border-radius:50%;background:${catColor};flex-shrink:0"></div>
-                        <span style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.3px">${cat ? escapeHtml(cat.name) : 'Task'}</span>
-                    </div>
-                    <p class="note-card-text" style="color:var(--text-primary)">${escapeHtml(task.title)}</p>
-                </div>
-                <div class="note-card-footer" style="color:var(--text-secondary)">
-                    ${due ? `<span style="font-size:10px;color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'}">${due}</span>` : '<span></span>'}
+        <div class="pinned-task-card"
+            draggable="true"
+            ondragstart="handlePinnedDragStart(event, '${task.id}')"
+            ondragend="handlePinnedDragEnd(event)"
+            ondragover="handlePinnedDragOver(event)"
+            ondragleave="handlePinnedDragLeave(event)"
+            ondrop="handlePinnedDrop(event, '${task.id}')"
+            onclick="openTaskModal('${task.id}')">
+            <div class="pinned-task-card-top">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
                     <button onclick="event.stopPropagation();toggleTaskCompletion('${task.id}')"
-                        style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--success);font-size:11px"
+                        class="pinned-task-checkbox"
                         title="Mark complete">
-                        <i class="fas fa-check"></i>
+                    </button>
+                    <div style="width:7px;height:7px;border-radius:50%;background:${catColor};flex-shrink:0"></div>
+                    <span style="font-size:10px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat ? escapeHtml(cat.name) : 'No category'}</span>
+                </div>
+                <div class="flex items-center gap-0.5">
+                    <i class="fas fa-grip-vertical pinned-drag-handle"></i>
+                    <button onclick="event.stopPropagation();togglePinTask('${task.id}')"
+                        style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px"
+                        title="Unpin">
+                        <i class="fas fa-thumbtack"></i>
                     </button>
                 </div>
             </div>
-        `;
+            <p class="pinned-task-card-title">${escapeHtml(task.title)}</p>
+            ${due ? `<p style="font-size:10px;margin-top:auto;padding-top:6px;color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'}">
+                <i class="fas fa-clock" style="margin-right:3px;opacity:0.7"></i>${due}
+            </p>` : ''}
+        </div>`;
     }).join('');
 
     section.innerHTML = `
@@ -125,7 +137,7 @@ function renderBoardPinned() {
             <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--text-secondary);text-transform:uppercase">Pinned Tasks</span>
             <span style="font-size:11px;color:var(--text-secondary);opacity:0.6">(${pinned.length})</span>
         </div>
-        <div class="board-notes-grid">${cards}</div>
+        <div class="pinned-tasks-grid">${cards}</div>
     `;
 }
 

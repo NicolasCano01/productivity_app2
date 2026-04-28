@@ -770,9 +770,12 @@ async function loadHabitInsight(habitId, habit, rate, streakInfo, days28) {
         renderHabitInsightResult(container, result);
     } else {
         container.innerHTML = `
-            <div style="color:var(--text-secondary);font-size:13px">
-                <i class="fas fa-circle-exclamation mr-2"></i>
-                AI insight unavailable — set the <code>XAI_API_KEY</code> secret in Supabase.
+            <div style="color:var(--text-secondary);font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span><i class="fas fa-circle-exclamation" style="margin-right:5px"></i>Couldn't load AI insight.</span>
+                <button onclick="reloadHabitInsight('${habitId}')"
+                    style="color:var(--accent);background:none;border:none;cursor:pointer;font-size:13px;padding:0;text-decoration:underline;font-family:inherit">
+                    Try again
+                </button>
             </div>`;
     }
 }

@@ -41,3 +41,27 @@ ALTER TABLE task_objectives ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all operations on task_objectives"
     ON task_objectives FOR ALL USING (true) WITH CHECK (true);
+
+-- ─────────────────────────────────────────────────────────────
+-- 3. Daily AI insights cache (per user, per day)
+--    Stores the AI-generated insights + motivational quote once
+--    per day so tokens are not consumed on every page refresh.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS daily_ai_insights (
+    id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id      uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    insight_date date NOT NULL,
+    insights     jsonb NOT NULL DEFAULT '[]',
+    quote        text,
+    quote_author text,
+    chart_data   jsonb,
+    created_at   timestamptz DEFAULT now(),
+    UNIQUE(user_id, insight_date)
+);
+
+ALTER TABLE daily_ai_insights ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage their own daily insights"
+    ON daily_ai_insights FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
