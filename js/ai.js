@@ -293,8 +293,18 @@ function gatherAIData() {
 // and asks the AI to include task suggestions.
 function buildInsightsSystemPrompt(data) {
     const today = getMelbourneDateString();
+
+    // Compute urgency sort key: overdue tasks first (most overdue = lowest key),
+    // then due today, then future by days, then no-date last.
+    function urgencySortKey(t) {
+        if (!t.due_date) return 99999;
+        const d = Math.round((new Date(t.due_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+        return d < 0 ? d : d; // negative = overdue (sorts first), positive = future
+    }
+
     const pendingTasks = (appState.tasks || [])
         .filter(t => t.status !== 'deleted' && !t.is_completed)
+        .sort((a, b) => urgencySortKey(a) - urgencySortKey(b))
         .map(t => {
             const cats = (t.extraCategories && t.extraCategories.length > 0)
                 ? t.extraCategories.map(c => c.name).join(', ')
@@ -306,7 +316,14 @@ function buildInsightsSystemPrompt(data) {
                 : daysUntilDue < 0 ? `OVERDUE ${Math.abs(daysUntilDue)}d`
                 : daysUntilDue === 0 ? 'due TODAY'
                 : `due in ${daysUntilDue}d`;
-            return `"${t.title}" [${urgency}]${cats ? ' {' + cats + '}' : ''}${t.goal ? ' (goal: ' + t.goal.name + ')' : ''}`;
+            const goalStr = t.goal ? ` (goal: ${t.goal.name})` : '';
+            const catStr = cats ? ` {${cats}}` : '';
+            const notesStr = t.notes ? ` — "${t.notes.slice(0, 80)}${t.notes.length > 80 ? '…' : ''}"` : '';
+            const pendingObjectives = (t.objectives || []).filter(o => !o.is_completed);
+            const objStr = pendingObjectives.length > 0
+                ? ` [${pendingObjectives.length} sub-task${pendingObjectives.length > 1 ? 's' : ''} open]`
+                : '';
+            return `"${t.title}" [${urgency}]${catStr}${goalStr}${notesStr}${objStr}`;
         })
         .slice(0, 30) // cap at 30 to avoid huge payloads
         .join('\n  ');
@@ -314,10 +331,10 @@ function buildInsightsSystemPrompt(data) {
     return `You are an AI productivity coach. The user is in Melbourne, Australia. Today is ${today} (${data.dayOfWeek}).
 Analyze their productivity data and respond with a JSON object with these fields:
 - "insights": array of 2-3 short motivational insight strings about habits/tasks/progress
-- "taskSuggestions": array of 2-3 actionable strings recommending which tasks to focus on (based on urgency, overdue status, goal alignment)
+- "taskSuggestions": array of 2-3 actionable strings recommending which tasks to focus on, ordered by urgency (overdue → due today → upcoming → no-date). Reference specific task names.
 - "chart": optional chart config object (type, labels, data, colors, title)
 
-Pending tasks (use these for taskSuggestions):
+Pending tasks sorted by urgency (overdue first, no-date last):
   ${pendingTasks || 'No pending tasks'}
 
 Productivity summary:
@@ -326,7 +343,7 @@ Productivity summary:
 - Habits today: ${data.habits.completedToday}/${data.habits.total}
 - Goals: ${(data.goals || []).map(g => g.name + ' ' + g.progress + '%').join(', ') || 'none'}
 
-Keep each insight/suggestion under 20 words. Be specific and actionable.`;
+Keep each insight/suggestion under 25 words. Be specific — name the actual task the user should focus on.`;
 }
 
 function formatWeekDate(d) {
