@@ -649,6 +649,21 @@ function renderHabitDetailPanel(habitId) {
         });
     }
 
+    // Build 91-day window (13 weeks) for large-screen view
+    const start91 = new Date(thisMonday);
+    start91.setDate(thisMonday.getDate() - 84); // 12 weeks back → 13 weeks total
+    const days91 = [];
+    for (let i = 0; i < 91; i++) {
+        const d = new Date(start91);
+        d.setDate(start91.getDate() + i);
+        const dateStr = formatDateString(d);
+        days91.push({
+            dateStr,
+            future: dateStr > todayStr,
+            done: !( dateStr > todayStr ) && isHabitCompletedOnDate(habitId, dateStr)
+        });
+    }
+
     const doneDays = days28.filter(d => !d.future && d.done).length;
     const possibleDays = days28.filter(d => !d.future).length;
     const rate = possibleDays > 0 ? Math.round((doneDays / possibleDays) * 100) : 0;
@@ -685,8 +700,10 @@ function renderHabitDetailPanel(habitId) {
         </div>
 
         <div class="habit-heatmap-section">
-            <p class="habit-section-title">Last 4 Weeks</p>
-            ${renderHabitHeatmap(days28)}
+            <p class="habit-section-title heatmap-label-mobile">Last 4 Weeks</p>
+            <p class="habit-section-title heatmap-label-desktop">Last 3 Months</p>
+            <div class="heatmap-mobile-view">${renderHabitHeatmap(days28)}</div>
+            <div class="heatmap-desktop-view">${renderHabitHeatmap91(days91)}</div>
         </div>
 
         <div class="habit-insight-section">
@@ -731,6 +748,52 @@ function renderHabitHeatmap(days28) {
         <div>
             <div class="heatmap-day-labels">${labelsHtml}</div>
             <div class="heatmap-grid">${cellsHtml}</div>
+            <div class="heatmap-legend">
+                <span><span class="heatmap-legend-dot" style="background:var(--accent)"></span>Done</span>
+                <span><span class="heatmap-legend-dot" style="background:var(--bg-tertiary);border:1px solid var(--border)"></span>Missed</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Renders the 13-week (3-month) heatmap for large screens.
+ * Uses an 8-column grid: month-label col + Mon–Sun.
+ */
+function renderHabitHeatmap91(days91) {
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dayLabels = ['M','T','W','T','F','S','S'];
+
+    const weeks = [];
+    let lastMonth = -1;
+    for (let w = 0; w < 13; w++) {
+        const week = days91.slice(w * 7, (w + 1) * 7);
+        const refDay = week.find(d => !d.future) || week[0];
+        const month = new Date(refDay.dateStr + 'T00:00:00').getMonth();
+        const monthLabel = month !== lastMonth ? MONTHS[month] : '';
+        if (month !== lastMonth) lastMonth = month;
+        weeks.push({ week, monthLabel });
+    }
+
+    const gridCells = weeks.map(({ week, monthLabel }) => {
+        const labelCell = `<div class="heatmap-month-tag">${monthLabel}</div>`;
+        const dayCells = week.map(day => {
+            let cls = 'heatmap-cell';
+            if (day.future) cls += ' heatmap-future';
+            else if (day.done) cls += ' heatmap-done';
+            else cls += ' heatmap-missed';
+            return `<div class="${cls}" title="${day.dateStr}${day.done ? ' ✓' : day.future ? '' : ' ✗'}"></div>`;
+        }).join('');
+        return labelCell + dayCells;
+    }).join('');
+
+    const dayLabelsHtml = `<div class="heatmap-month-tag"></div>` +
+        dayLabels.map(l => `<div class="heatmap-day-label">${l}</div>`).join('');
+
+    return `
+        <div>
+            <div class="heatmap-day-labels-91">${dayLabelsHtml}</div>
+            <div class="heatmap-grid-91">${gridCells}</div>
             <div class="heatmap-legend">
                 <span><span class="heatmap-legend-dot" style="background:var(--accent)"></span>Done</span>
                 <span><span class="heatmap-legend-dot" style="background:var(--bg-tertiary);border:1px solid var(--border)"></span>Missed</span>
