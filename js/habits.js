@@ -804,18 +804,41 @@ function renderHabitHeatmap91(days91) {
 
 /**
  * Fetches (or returns cached) AI insight for a habit and renders it.
+ * Cache hierarchy: in-memory → localStorage → Supabase DB → fresh AI call.
  */
 async function loadHabitInsight(habitId, habit, rate, streakInfo, days28) {
     const container = document.getElementById(`habit-insight-${habitId}`);
     if (!container) return;
 
-    // Return cached result instantly
+    const todayStr = getMelbourneDateString();
+
+    // 1. In-memory cache (fastest)
     if (habitInsightCache[habitId]) {
         renderHabitInsightResult(container, habitInsightCache[habitId]);
         return;
     }
 
-    // Build the 28-day pattern string (oldest→newest)
+    // 2. localStorage cache (cross-session, same device)
+    const lsEntry = aiCache.habitInsights?.[habitId];
+    if (lsEntry && lsEntry.date === todayStr && lsEntry.insight) {
+        habitInsightCache[habitId] = lsEntry;
+        renderHabitInsightResult(container, lsEntry);
+        return;
+    }
+
+    // 3. Supabase DB cache (cross-device)
+    const dbEntry = await loadHabitInsightFromDB(habitId, todayStr);
+    if (dbEntry && dbEntry.insight) {
+        habitInsightCache[habitId] = dbEntry;
+        if (!aiCache.habitInsights) aiCache.habitInsights = {};
+        aiCache.habitInsights[habitId] = { ...dbEntry, date: todayStr };
+        saveAICacheToStorage();
+        if (!container.isConnected) return;
+        renderHabitInsightResult(container, dbEntry);
+        return;
+    }
+
+    // 4. Fresh AI call
     const recentDays = days28.map(d => d.future ? 'f' : (d.done ? '1' : '0')).join('');
 
     const result = await callAI('habit_insight', {
@@ -826,10 +849,14 @@ async function loadHabitInsight(habitId, habit, rate, streakInfo, days28) {
         recentDays
     });
 
-    if (!container.isConnected) return; // panel may have changed while waiting
+    if (!container.isConnected) return;
 
     if (result && result.insight) {
         habitInsightCache[habitId] = result;
+        if (!aiCache.habitInsights) aiCache.habitInsights = {};
+        aiCache.habitInsights[habitId] = { ...result, date: todayStr };
+        saveAICacheToStorage();
+        saveHabitInsightToDB(habitId, todayStr, result);
         renderHabitInsightResult(container, result);
     } else {
         container.innerHTML = `
@@ -873,10 +900,15 @@ function renderHabitInsightResult(container, data) {
 }
 
 /**
- * Clears the insight cache for a habit and re-renders the detail panel.
+ * Clears all caches for a habit insight and re-renders the detail panel.
  */
 function reloadHabitInsight(habitId) {
     delete habitInsightCache[habitId];
+    // Clear localStorage cache for this habit
+    if (aiCache.habitInsights) {
+        delete aiCache.habitInsights[habitId];
+        saveAICacheToStorage();
+    }
     if (selectedHabitId === habitId) {
         renderHabitDetailPanel(habitId);
     }

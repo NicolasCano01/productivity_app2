@@ -65,3 +65,10 @@ CREATE POLICY "Users manage their own daily insights"
     ON daily_ai_insights FOR ALL
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- 4. Per-habit AI insight cache (one JSONB column per day row)
+--    Keys are habit UUIDs, values are the AI insight objects.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE daily_ai_insights
+    ADD COLUMN IF NOT EXISTS habit_insights jsonb NOT NULL DEFAULT '{}'::jsonb;

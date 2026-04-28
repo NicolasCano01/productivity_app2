@@ -30,7 +30,8 @@ function loadAICacheFromStorage() {
         dailyQuoteAuthor: null,
         dailyQuoteDate: null,
         panelInsights: null,
-        panelInsightsDate: null
+        panelInsightsDate: null,
+        habitInsights: {}  // { [habitId]: { date, insight, trend, tip } }
     };
 }
 
@@ -78,6 +79,30 @@ async function loadInsightsFromDB(todayStr) {
         return data;
     } catch (e) {
         return null;
+    }
+}
+
+// Load a single habit's cached insight from DB for today
+async function loadHabitInsightFromDB(habitId, todayStr) {
+    const row = await loadInsightsFromDB(todayStr);
+    return row?.habit_insights?.[habitId] || null;
+}
+
+// Persist a single habit's insight into the daily_ai_insights row (merge with existing)
+async function saveHabitInsightToDB(habitId, todayStr, data) {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+        const existing = await loadInsightsFromDB(todayStr);
+        const merged = { ...(existing?.habit_insights || {}), [habitId]: data };
+        await supabaseClient.from('daily_ai_insights').upsert({
+            user_id: session.user.id,
+            insight_date: todayStr,
+            habit_insights: merged
+        }, { onConflict: 'user_id,insight_date' });
+    } catch (e) {
+        console.warn('Could not persist habit insight to DB:', e);
     }
 }
 
