@@ -1,6 +1,45 @@
 // ============================================
 // PRODUCTIVITY HUB - GOOGLE TASKS INTEGRATION
 // ============================================
+//
+// WHAT THIS DOES
+// --------------
+// Syncs every active, incomplete task that has a due_date to a
+// "Productivity Hub" list in Google Tasks.  The `due` field is
+// set on each Google Task in RFC 3339 format (required by the
+// Google Tasks API), which causes those tasks to appear as
+// reminders on the matching day in Google Calendar automatically.
+//
+// USER SETUP — one-time, takes ~5 minutes
+// ----------------------------------------
+// 1. Open https://console.cloud.google.com and create (or pick) a project.
+// 2. Enable the Google Tasks API:
+//      APIs & Services → Library → search "Tasks API" → Enable
+// 3. Configure the OAuth consent screen:
+//      APIs & Services → OAuth consent screen
+//      → User Type: External → fill in App name & support email
+//      → Scopes: add "https://www.googleapis.com/auth/tasks"
+//      → Test users: add your own Google account email
+//      (You can leave the app in "Testing" — no review needed for personal use)
+// 4. Create an OAuth 2.0 Client ID:
+//      APIs & Services → Credentials → Create Credentials → OAuth Client ID
+//      → Application type: Web application
+//      → Authorized JavaScript origins: your site origin (e.g. http://localhost:8080)
+//      → Authorized redirect URIs: origin + /oauth-callback.html
+//        (e.g. http://localhost:8080/oauth-callback.html)
+// 5. Copy the Client ID and paste it into config.js as GOOGLE_CLIENT_ID.
+//
+// HOW IT WORKS
+// ------------
+// - Uses the implicit OAuth 2.0 flow (response_type=token) via a popup.
+// - The access token is stored in localStorage with its expiry time.
+// - Tokens expire after 1 hour; the UI shows the expiry and prompts
+//   reconnection when expired.
+// - syncToGoogleTasks() deduplicates by task title to avoid creating
+//   duplicate entries on repeated syncs.
+// - Google Calendar automatically shows tasks that have a `due` date
+//   (no extra configuration required).
+// ============================================
 
 const GT_SCOPE = 'https://www.googleapis.com/auth/tasks';
 const GT_API = 'https://tasks.googleapis.com/tasks/v1';
@@ -192,9 +231,14 @@ function updateGoogleTasksUI() {
     if (connectBtn) connectBtn.classList.toggle('hidden', connected);
     if (syncBtns) syncBtns.classList.toggle('hidden', !connected);
     if (statusEl) {
-        statusEl.innerHTML = connected
-            ? '<i class="fas fa-check-circle mr-1" style="color:var(--success)"></i> Connected'
-            : '<i class="fas fa-circle mr-1" style="opacity:0.4"></i> Not connected';
+        if (connected) {
+            const expiry = parseInt(localStorage.getItem(GT_EXPIRY_KEY) || '0');
+            const minsLeft = Math.round((expiry - Date.now()) / 60000);
+            const expiryNote = minsLeft > 0 ? ` (expires in ${minsLeft} min)` : '';
+            statusEl.innerHTML = `<i class="fas fa-check-circle mr-1" style="color:var(--success)"></i> Connected${expiryNote}`;
+        } else {
+            statusEl.innerHTML = '<i class="fas fa-circle mr-1" style="opacity:0.4"></i> Not connected';
+        }
     }
 }
 

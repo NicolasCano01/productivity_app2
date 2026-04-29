@@ -480,15 +480,19 @@
                         </button>
                     </div>
                     <div id="gt-setup-instructions" class="hidden mt-3 rounded-xl p-3" style="background:var(--bg-secondary);border:1px solid var(--border)">
-                        <p style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Setup (one-time):</p>
+                        <p style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Setup (one-time, ~5 min):</p>
                         <ol style="font-size:11px;color:var(--text-secondary);line-height:1.8;padding-left:14px">
-                            <li>Go to <strong>console.cloud.google.com</strong> and create a project</li>
-                            <li>Enable the <strong>Google Tasks API</strong></li>
-                            <li>Go to APIs &amp; Services → Credentials → Create Credentials → OAuth Client ID</li>
-                            <li>Application type: <strong>Web application</strong></li>
-                            <li>Add your site URL to Authorized JavaScript origins AND Authorized redirect URIs, append <code>/oauth-callback.html</code> to the redirect URI</li>
+                            <li>Go to <strong>console.cloud.google.com</strong> → create or pick a project</li>
+                            <li>Enable the <strong>Google Tasks API</strong> (APIs &amp; Services → Library)</li>
+                            <li>Configure the <strong>OAuth consent screen</strong>: User Type = External, add your Google email as a <strong>Test user</strong>, add scope <code>tasks</code></li>
+                            <li>Create credentials: APIs &amp; Services → Credentials → Create Credentials → <strong>OAuth Client ID</strong> → Application type: <strong>Web application</strong></li>
+                            <li>Authorized JavaScript origins: your site URL (e.g. <code>http://localhost:8080</code>)<br>Authorized redirect URIs: same URL + <code>/oauth-callback.html</code></li>
                             <li>Copy the Client ID into <code>config.js</code> as <strong>GOOGLE_CLIENT_ID</strong></li>
                         </ol>
+                        <p style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">
+                            <i class="fas fa-calendar-check mr-1" style="color:var(--accent)"></i>
+                            Tasks with a due date will appear in <strong>Google Calendar</strong> on that date automatically once synced.
+                        </p>
                     </div>
                 </div>
             </div>
