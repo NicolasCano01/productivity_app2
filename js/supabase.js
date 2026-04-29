@@ -253,30 +253,67 @@ async function loadTaskRelations(taskIds = null) {
 }
 
 // ============================================
-// SUPABASE KEEP-ALIVE (ping every 20 min)
+// SUPABASE KEEP-ALIVE (ping every 20 min via insert+delete)
+//
+// Supabase free-tier projects pause after 7 days of no activity.
+// A read-only ping does NOT reset the inactivity timer on all plans;
+// an actual write (INSERT) guarantees the project stays awake.
+//
+// We INSERT one row into _keepalive and DELETE it immediately so
+// the table never accumulates data.  The timestamp is stored in
+// localStorage so we can also fire a write on app startup when the
+// app wasn't opened for a long time.
+//
+// Required SQL (migration 5):
+//   CREATE TABLE IF NOT EXISTS _keepalive (
+//       id        uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+//       pinged_at timestamptz DEFAULT now()
+//   );
+//   ALTER TABLE _keepalive ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "Allow all on _keepalive"
+//       ON _keepalive FOR ALL USING (true) WITH CHECK (true);
 // ============================================
+const KEEPALIVE_LS_KEY = 'supabase_last_keepalive';
 let _keepAliveTimer = null;
+
+async function pingSupabaseDB() {
+    try {
+        // Insert a dummy row
+        const { data, error: insertErr } = await supabaseClient
+            .from('_keepalive')
+            .insert({ pinged_at: new Date().toISOString() })
+            .select('id')
+            .single();
+
+        if (insertErr) throw insertErr;
+
+        // Delete it immediately — keep the table empty
+        await supabaseClient.from('_keepalive').delete().eq('id', data.id);
+
+        const ts = new Date().toISOString();
+        localStorage.setItem(KEEPALIVE_LS_KEY, ts);
+        console.log('💓 Supabase keep-alive: insert+delete OK at', ts);
+        updateConnectionStatus(true);
+        return true;
+    } catch (err) {
+        console.warn('⚠️ Supabase keep-alive failed:', err.message);
+        updateConnectionStatus(false, err.message);
+        return false;
+    }
+}
 
 function startSupabaseKeepAlive() {
     if (_keepAliveTimer) return; // already running
-    _keepAliveTimer = setInterval(async () => {
-        try {
-            // Lightweight read — just checks the connection is alive
-            const { error } = await supabaseClient
-                .from('categories')
-                .select('id')
-                .limit(1);
-            if (error) {
-                console.warn('⚠️ Keep-alive ping failed:', error.message);
-                updateConnectionStatus(false, error.message);
-            } else {
-                console.log('💓 Supabase keep-alive OK');
-                updateConnectionStatus(true);
-            }
-        } catch (err) {
-            console.warn('⚠️ Keep-alive error:', err.message);
-        }
-    }, 20 * 60 * 1000); // every 20 minutes
+
+    // Fire immediately on startup if last ping was >3 days ago (or never)
+    const lastPing = localStorage.getItem(KEEPALIVE_LS_KEY);
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+    if (!lastPing || Date.now() - new Date(lastPing).getTime() > threeDaysMs) {
+        pingSupabaseDB();
+    }
+
+    // Then ping every 20 minutes while the app is open
+    _keepAliveTimer = setInterval(pingSupabaseDB, 20 * 60 * 1000);
 }
 
 function stopSupabaseKeepAlive() {
