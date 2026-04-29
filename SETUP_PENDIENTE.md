@@ -6,14 +6,14 @@ Todo el código ya está deployado en GitHub Pages. Lo que queda son **configura
 
 ## Índice
 
-1. [Grok AI (Obligatorio para que funcione el AI)](#1-grok-ai)
+1. [Gemini AI (Obligatorio para que funcione el AI)](#1-gemini-ai)
 2. [Supabase: Múltiples categorías + objetivos](#2-supabase-migracion)
 3. [Google Sheets Backup](#3-google-sheets-backup)
 4. [Google Tasks Sync](#4-google-tasks-sync)
 
 ---
 
-## 1. Grok AI
+## 1. Gemini AI
 
 > **Impacto:** Sin esto, el AI no funciona (insights, quotes, chat, habit insights). Es el cambio más importante.
 
@@ -21,10 +21,10 @@ Todo el código ya está deployado en GitHub Pages. Lo que queda son **configura
 
 ### Cómo obtener la API key (gratis)
 
-1. Ir a **[console.x.ai](https://console.x.ai)**
-2. Crear una cuenta (se puede iniciar sesión con Google o X/Twitter)
-3. En el dashboard, ir a **API Keys** → **Create API Key**
-4. Copiar la key (empieza con `xai-...`)
+1. Ir a **[aistudio.google.com](https://aistudio.google.com)**
+2. Iniciar sesión con tu cuenta de Google
+3. Click en **"Get API key"** → **"Create API key"**
+4. Copiar la key (empieza con `AIza...`)
 
 ### Configurarlo en Supabase (no en el repo)
 
@@ -34,8 +34,8 @@ Todo el código ya está deployado en GitHub Pages. Lo que queda son **configura
 4. Click en la función **`ai-proxy`**
 5. Click en la pestaña **Secrets** (o buscar en la sidebar "Secrets")
 6. Click **"Add new secret"** (o el botón `+`)
-   - **Name:** `XAI_API_KEY`
-   - **Value:** `xai-TuKeyAqui...`
+   - **Name:** `GEMINI_API_KEY`
+   - **Value:** `AIza-TuKeyAqui...`
 7. Guardar
 
 No hay que hacer ningún commit — la key nunca está en el código ni en GitHub.
@@ -46,7 +46,7 @@ Abrir la app → panel Calendar → esperar que aparezca la frase motivacional y
 
 También: ir al panel **Habits** → click en cualquier hábito → debería aparecer el "AI Insight" en el panel de la derecha (desktop).
 
-> **Nota sobre costos:** El modelo `grok-3-mini` tiene un free tier generoso. Con el uso normal de esta app (1-2 veces por día) no debería costar nada o muy poco.
+> **Nota sobre costos:** Gemini tiene un free tier generoso (vía Google AI Studio). Con el uso normal de esta app (1-2 veces por día) no debería costar nada.
 
 ---
 
@@ -268,7 +268,7 @@ Las tareas con fecha de vencimiento van a aparecer en la app de Google Tasks baj
 
 | Tarea | Tiempo estimado | Necesita |
 |-------|----------------|----------|
-| 1. Grok AI key | 5 min | Cuenta en x.ai |
+| 1. Gemini AI key | 5 min | Cuenta de Google |
 | 2. Supabase migration | 2 min | Acceso al dashboard de Supabase |
 | 3. Google Sheets backup | 10 min | Cuenta de Google |
 | 4. Google Tasks sync | 20 min | Cuenta de Google + Google Cloud |
@@ -281,7 +281,7 @@ Las tareas con fecha de vencimiento van a aparecer en la app de Google Tasks baj
 
 | Archivo | Qué contiene |
 |---------|-------------|
-| `js/config.js` | Las 3 keys a configurar (xAI, Google Client ID) |
+| `js/config.js` | Google Client ID (Gemini key va en Supabase Secrets, no aquí) |
 | `sql/migrations.sql` | SQL listo para correr en Supabase |
 | `oauth-callback.html` | Página técnica para el login de Google (no modificar) |
 | `js/google-tasks.js` | Lógica de sincronización con Google Tasks |

@@ -1,8 +1,8 @@
 // ============================================
-// PRODUCTIVITY HUB - AI MODULE (powered by Grok / xAI)
+// PRODUCTIVITY HUB - AI MODULE (powered by Gemini)
 // ============================================
 
-// AI calls go through the Supabase Edge Function so the xAI key never lives in the repo
+// AI calls go through the Supabase Edge Function so the Gemini key never lives in the repo
 const AI_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
 
 // Cache for daily insights and quote (avoid repeated API calls)
@@ -123,7 +123,7 @@ let aiChatHistory = [];
 
 // ============================================
 // AI API CALL (via Supabase Edge Function proxy)
-// The xAI key is stored as a Supabase secret — never in the repo.
+// The Gemini API key is stored as a Supabase secret — never in the repo.
 // ============================================
 async function callAI(type, data = {}, messages = [], systemPrompt = '') {
     try {
