@@ -158,12 +158,22 @@ function gatherAIData() {
     const { start: weekStart, end: weekEnd } = getMelbourneWeekRange();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    // Last week range
+    // Days elapsed since Monday this week (Mon=0 … Sat=5, Sun=6)
+    const dow = today.getDay();
+    const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+
+    // Last week range (full)
     const lastWeekStart = new Date(weekStart);
     lastWeekStart.setDate(weekStart.getDate() - 7);
     const lastWeekEnd = new Date(weekStart);
     lastWeekEnd.setDate(weekStart.getDate() - 1);
     lastWeekEnd.setHours(23, 59, 59, 999);
+
+    // Fair comparison end: same day-of-week slice as this week
+    // e.g. if today is Thursday, only count Mon–Thu of last week
+    const lastWeekComparableEnd = new Date(lastWeekStart);
+    lastWeekComparableEnd.setDate(lastWeekStart.getDate() + daysSinceMonday);
+    lastWeekComparableEnd.setHours(23, 59, 59, 999);
 
     // This month range
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -183,11 +193,11 @@ function gatherAIData() {
         return d >= weekStart && d <= weekEnd;
     });
 
-    // Tasks completed last week
+    // Tasks completed last week (same day-of-week slice as this week — fair comparison)
     const tasksCompletedLastWeek = activeTasks.filter(t => {
         if (!t.is_completed || !t.completed_at) return false;
         const d = new Date(t.completed_at);
-        return d >= lastWeekStart && d <= lastWeekEnd;
+        return d >= lastWeekStart && d <= lastWeekComparableEnd;
     });
 
     // Tasks completed this month
@@ -232,11 +242,12 @@ function gatherAIData() {
         c.completion_date >= weekStartStr && c.completion_date <= weekEndStr
     ).length;
 
-    // Habit completions last week
+    // Habit completions last week (same day-of-week slice — fair comparison)
     const lastWeekStartStr = formatWeekDate(lastWeekStart);
     const lastWeekEndStr = formatWeekDate(lastWeekEnd);
+    const lastWeekComparableEndStr = formatWeekDate(lastWeekComparableEnd);
     const habitCompletionsLastWeek = appState.habitCompletions.filter(c =>
-        c.completion_date >= lastWeekStartStr && c.completion_date <= lastWeekEndStr
+        c.completion_date >= lastWeekStartStr && c.completion_date <= lastWeekComparableEndStr
     ).length;
 
     // Streaks
@@ -338,7 +349,7 @@ Pending tasks sorted by urgency (overdue first, no-date last):
   ${pendingTasks || 'No pending tasks'}
 
 Productivity summary:
-- Completed this week: ${data.tasks.completedThisWeek}, last week: ${data.tasks.completedLastWeek}
+- Completed this week (Mon–${data.dayOfWeek}): ${data.tasks.completedThisWeek}, last week same slice (Mon–${data.dayOfWeek}): ${data.tasks.completedLastWeek}
 - Overdue: ${data.tasks.overdue.length}
 - Habits today: ${data.habits.completedToday}/${data.habits.total}
 - Goals: ${(data.goals || []).map(g => g.name + ' ' + g.progress + '%').join(', ') || 'none'}
