@@ -8,6 +8,9 @@ let selectedNoteColor = '#FEF08A'; // default yellow
 
 // ============================================
 // STORAGE HELPERS
+// localStorage acts as a fast local cache.
+// All writes are mirrored to Supabase async.
+// On board open, Supabase is the source of truth.
 // ============================================
 function loadNotes() {
     try {
@@ -18,11 +21,90 @@ function loadNotes() {
     }
 }
 
-function saveNotes(notes) {
+function saveNotesLocal(notes) {
     try {
         localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
     } catch (e) {
-        console.warn('Failed to save notes:', e);
+        console.warn('Failed to save notes to localStorage:', e);
+    }
+}
+
+// ============================================
+// SUPABASE SYNC
+// ============================================
+
+// Load all notes for the current user from Supabase.
+// On success, overwrites localStorage cache and re-renders.
+// Falls back silently to the existing localStorage data on error.
+async function syncNotesFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabaseClient
+            .from('sticky_notes')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const notes = data.map(row => ({
+            id:        row.id,
+            content:   row.content,
+            color:     row.color || '#FEF08A',
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        }));
+
+        saveNotesLocal(notes);
+        renderBoardNotes();
+    } catch (e) {
+        console.warn('Could not sync notes from Supabase (using localStorage):', e.message);
+    }
+}
+
+// Upsert a single note to Supabase.
+async function saveNoteToSupabase(note) {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const { error } = await supabaseClient
+            .from('sticky_notes')
+            .upsert({
+                id:         note.id,
+                user_id:    session.user.id,
+                content:    note.content,
+                color:      note.color || '#FEF08A',
+                created_at: note.createdAt,
+                updated_at: note.updatedAt
+            }, { onConflict: 'id' });
+
+        if (error) throw error;
+    } catch (e) {
+        console.warn('Could not save note to Supabase (saved locally):', e.message);
+    }
+}
+
+// Delete a single note from Supabase.
+async function deleteNoteFromSupabase(noteId) {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const { error } = await supabaseClient
+            .from('sticky_notes')
+            .delete()
+            .eq('id', noteId)
+            .eq('user_id', session.user.id);
+
+        if (error) throw error;
+    } catch (e) {
+        console.warn('Could not delete note from Supabase:', e.message);
     }
 }
 
@@ -30,8 +112,12 @@ function saveNotes(notes) {
 // RENDER
 // ============================================
 function renderBoard() {
+    // Sync from Supabase each time the board panel opens.
+    // syncNotesFromSupabase() re-renders after the fetch completes,
+    // so renderBoardNotes() below shows cached data instantly first.
     renderBoardNotes();
     renderBoardPinned();
+    syncNotesFromSupabase();
 }
 
 function renderBoardNotes() {
@@ -55,7 +141,6 @@ function renderBoardNotes() {
 }
 
 function renderNoteCard(note) {
-    const isDark = document.body.classList.contains('dark');
     const textColor = '#1D1D1F'; // notes always use dark text regardless of app theme
     const created = new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -198,6 +283,7 @@ function saveNote() {
     }
 
     const notes = loadNotes();
+    let savedNote;
 
     if (editingNoteId) {
         const idx = notes.findIndex(n => n.id === editingNoteId);
@@ -205,18 +291,23 @@ function saveNote() {
             notes[idx].content = content;
             notes[idx].color = selectedNoteColor;
             notes[idx].updatedAt = new Date().toISOString();
+            savedNote = notes[idx];
         }
     } else {
-        notes.unshift({
+        savedNote = {
             id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
             content,
             color: selectedNoteColor,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-        });
+        };
+        notes.unshift(savedNote);
     }
 
-    saveNotes(notes);
+    // Save locally first (instant), then mirror to Supabase
+    saveNotesLocal(notes);
+    if (savedNote) saveNoteToSupabase(savedNote);
+
     closeNoteModal();
     renderBoardNotes();
     showToast(editingNoteId ? 'Note updated' : 'Note added', 'success');
@@ -230,7 +321,9 @@ function deleteNote() {
 
 function deleteNoteById(noteId) {
     const notes = loadNotes().filter(n => n.id !== noteId);
-    saveNotes(notes);
+    // Save locally first (instant), then mirror to Supabase
+    saveNotesLocal(notes);
+    deleteNoteFromSupabase(noteId);
     renderBoardNotes();
     showToast('Note deleted', 'success');
 }

@@ -72,3 +72,41 @@ CREATE POLICY "Users manage their own daily insights"
 -- ─────────────────────────────────────────────────────────────
 ALTER TABLE daily_ai_insights
     ADD COLUMN IF NOT EXISTS habit_insights jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- ─────────────────────────────────────────────────────────────
+-- 5a. Sticky notes — Board panel notes stored in Supabase so
+--     they sync across devices.  Falls back to localStorage
+--     if the DB is unreachable.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sticky_notes (
+    id         text        PRIMARY KEY,             -- 'note_<timestamp>_<rand>' (matches client ids)
+    user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    content    text        NOT NULL,
+    color      text        NOT NULL DEFAULT '#FEF08A',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE sticky_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage their own sticky notes"
+    ON sticky_notes FOR ALL
+    USING  (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5b. Keep-alive table — write-pinged every 20 min while the
+--     app is open (and on startup if >3 days since last ping)
+--     so the free-tier Supabase project never goes idle/paused.
+--     Rows are inserted and immediately deleted; the table stays
+--     empty at all times.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS _keepalive (
+    id        uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+    pinged_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE _keepalive ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all on _keepalive"
+    ON _keepalive FOR ALL USING (true) WITH CHECK (true);
