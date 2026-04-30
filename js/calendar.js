@@ -22,8 +22,8 @@ function renderCalendar() {
     if (!currentCalendarDate) currentCalendarDate = getMelbourneDate();
 
     calendarView.innerHTML = buildCalendarHTML();
-    // After rendering, scroll the date strip to today
-    scrollDateStripToSelected();
+    // After rendering, snap the date strip so today/selected is centred
+    scrollDateStripToSelected(true);
 
     // Load AI insights asynchronously (non-blocking)
     if (calendarViewMode === 'upcoming' && typeof loadCalendarInsights === 'function') {
@@ -64,14 +64,24 @@ function buildCalendarHTML() {
 // UPCOMING VIEW (Things 3 style)
 // ============================================
 function buildUpcomingView(today, todayStr) {
-    // Build horizontal date strip (current Mon-Sun week, 7 pills)
-    const { start: weekMonday } = getMelbourneWeekRange();
-    const stripStart = new Date(weekMonday);
+    // Wide screens (≥900px): 21-day strip centred on today.
+    // Narrow screens (<900px): original 7-day Mon-Sun week strip.
+    const isWide = window.innerWidth >= 900;
+    let stripStart, stripCount;
+    if (isWide) {
+        stripCount = 21;
+        stripStart = new Date(today);
+        stripStart.setDate(stripStart.getDate() - 10);
+    } else {
+        stripCount = 7;
+        const { start: weekMonday } = getMelbourneWeekRange();
+        stripStart = new Date(weekMonday);
+    }
 
     let stripHtml = '<div id="date-strip-scroll" class="overflow-x-auto pb-2 mb-4" style="-webkit-overflow-scrolling:touch;scrollbar-width:none">';
     stripHtml += '<div id="date-strip" class="flex gap-2" style="min-width:max-content;padding:4px 2px">';
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < stripCount; i++) {
         const d = new Date(stripStart);
         d.setDate(d.getDate() + i);
         const dStr = formatDateForDB(d);
@@ -571,12 +581,13 @@ function scrollToDateSection(dateStr) {
     }
 }
 
-function scrollDateStripToSelected() {
+function scrollDateStripToSelected(instant = false) {
     if (!selectedDate) return;
     const pill = document.getElementById(`strip-${selectedDate}`);
-    if (pill) {
-        pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
+    const container = document.getElementById('date-strip-scroll');
+    if (!pill || !container) return;
+    const scrollLeft = pill.offsetLeft - (container.offsetWidth / 2) + (pill.offsetWidth / 2);
+    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: instant ? 'instant' : 'smooth' });
 }
 
 // Navigation functions (used in month view)
