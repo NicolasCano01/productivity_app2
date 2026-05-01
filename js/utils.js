@@ -69,10 +69,10 @@ function switchPanel(panelName) {
         if (typeof renderBoard === 'function') renderBoard();
     }
 
-    // Show/hide AI chat FAB on Calendar & Analytics panels only
+    // Show/hide AI chat FAB on Calendar, Analytics & Board panels
     const fab = document.getElementById('ai-chat-fab');
     if (fab) {
-        if (panelName === 'calendar' || panelName === 'analytics') {
+        if (panelName === 'calendar' || panelName === 'analytics' || panelName === 'board') {
             fab.classList.remove('hidden');
         } else {
             fab.classList.add('hidden');
@@ -244,7 +244,7 @@ function toggleDarkMode() {
     const isDark = document.body.classList.toggle('dark');
     localStorage.setItem('darkMode', isDark ? '1' : '0');
     const icon = document.getElementById('dark-mode-icon');
-    if (icon) icon.className = isDark ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+    if (icon) icon.className = isDark ? 'fas fa-moon text-xl' : 'fas fa-sun text-xl';
 }
 
 // Restore dark mode on load
@@ -252,7 +252,7 @@ function initDarkMode() {
     if (localStorage.getItem('darkMode') === '1') {
         document.body.classList.add('dark');
         const icon = document.getElementById('dark-mode-icon');
-        if (icon) icon.className = 'fas fa-sun text-xl';
+        if (icon) icon.className = 'fas fa-moon text-xl';
     }
 }
 

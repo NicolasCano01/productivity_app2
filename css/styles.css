@@ -9,12 +9,17 @@
     --bg-tertiary:      #EBEBED;
     --text-primary:     #1D1D1F;
     --text-secondary:   #6E6E73;
+    --text-muted:       #AEAEB2;
     --accent:           #007AFF;
     --accent-hover:     #0066DD;
+    --accent-light:     rgba(0,122,255,0.10);
     --border:           #E5E5EA;
+    --card-bg:          #FFFFFF;
+    --input-bg:         #F5F5F7;
     --success:          #34C759;
     --warning:          #FF9500;
     --danger:           #FF3B30;
+    --shadow:           0 2px 8px rgba(0,0,0,0.08);
     --shadow-sm:        0 1px 3px rgba(0,0,0,0.06);
     --shadow-md:        0 4px 12px rgba(0,0,0,0.08);
     --radius-card:      12px;
@@ -28,12 +33,17 @@ body.dark {
     --bg-tertiary:      #2C2C2E;
     --text-primary:     #FFFFFF;
     --text-secondary:   #98989D;
+    --text-muted:       #636366;
     --accent:           #0A84FF;
     --accent-hover:     #409CFF;
+    --accent-light:     rgba(10,132,255,0.15);
     --border:           #3A3A3C;
+    --card-bg:          #1C1C1E;
+    --input-bg:         #2C2C2E;
     --success:          #30D158;
     --warning:          #FF9F0A;
     --danger:           #FF453A;
+    --shadow:           0 2px 8px rgba(0,0,0,0.40);
     --shadow-sm:        0 1px 3px rgba(0,0,0,0.35);
     --shadow-md:        0 4px 12px rgba(0,0,0,0.45);
 }
@@ -534,9 +544,23 @@ body.dark .bottom-nav {
 }
 
 .task-group-chevron {
-    font-size: 9px;
-    opacity: 0.45;
+    font-size: 15px;
+    opacity: 0.55;
     transition: transform 0.2s ease;
+}
+
+/* ---- Adaptive textarea sizing ---- */
+.adaptive-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+@media (min-width: 768px) {
+    .adaptive-textarea {
+        min-height: 160px;
+    }
+    #goal-description.adaptive-textarea {
+        min-height: 80px;
+    }
 }
 
 /* ---- Truncate notes to 2 lines ---- */
@@ -1404,7 +1428,7 @@ body.dark .habit-card.selected {
 
 .habit-detail-name {
     font-size: 22px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
     margin: 0 0 2px 0;
     line-height: 1.2;
@@ -1457,7 +1481,7 @@ body.dark .habit-card.selected {
 
 .habit-stat-value {
     font-size: 26px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
     line-height: 1;
     margin-bottom: 5px;

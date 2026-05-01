@@ -174,7 +174,7 @@ function renderHabits() {
                         onclick="toggleHabitCompletion('${habit.id}', '${habitLogDate}')"
                     ></div>
                     <div class="flex-1 min-w-0" onclick="selectHabit('${habit.id}')">
-                        <h3 class="font-semibold text-sm ${isCompleted ? 'line-through text-gray-400' : ''} truncate" style="color:var(--text-primary)">
+                        <h3 class="font-semibold text-sm truncate" style="color:${isCompleted ? 'var(--success)' : 'var(--text-primary)'};opacity:${isCompleted ? '0.75' : '1'};transition:color 0.2s,opacity 0.2s">
                             ${habit.name}
                         </h3>
                         <div class="flex items-center gap-2 mt-0.5">
