@@ -595,7 +595,19 @@ async function deleteHabit() {
  * On mobile opens the edit modal (unchanged behaviour).
  */
 function selectHabit(habitId) {
+    if (window.innerWidth < 768) {
+        // Mobile: slide up detail panel as a bottom sheet
+        selectedHabitId = habitId;
+        renderHabitDetailPanel(habitId);
+        const panel = document.getElementById('habit-detail-panel');
+        if (panel) panel.classList.add('sheet-open');
+        const backdrop = document.getElementById('habit-sheet-backdrop');
+        if (backdrop) backdrop.style.display = 'block';
+        return;
+    }
+
     if (window.innerWidth < 1024) {
+        // Tablet (768-1023px): fall back to edit modal
         openEditHabitModal(habitId);
         return;
     }
@@ -608,6 +620,13 @@ function selectHabit(habitId) {
     });
 
     renderHabitDetailPanel(habitId);
+}
+
+function closeHabitSheet() {
+    const panel = document.getElementById('habit-detail-panel');
+    if (panel) panel.classList.remove('sheet-open');
+    const backdrop = document.getElementById('habit-sheet-backdrop');
+    if (backdrop) backdrop.style.display = 'none';
 }
 
 /**

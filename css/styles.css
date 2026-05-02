@@ -1392,6 +1392,94 @@ body.dark #login-modal input {
         max-width: 560px;
         margin-bottom: 0;
     }
+
+    /* Analytics: constrain to a readable max-width */
+    #analytics-panel {
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* ============================================
+   TABLET BREAKPOINT (768–1023px)
+   ============================================ */
+@media (min-width: 768px) and (max-width: 1023px) {
+    /* Analytics: 4-col summary bar on tablet */
+    #analytics-summary-bar {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ============================================
+   HABIT BOTTOM SHEET — backdrop + close button
+   ============================================ */
+#habit-sheet-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.42);
+    z-index: 7999;
+}
+
+/* Handle bar: only visible when sheet is open */
+.habit-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 4px auto 12px;
+    display: none;
+}
+
+/* Close button: hidden by default, flex on mobile sheet */
+.habit-sheet-close-btn {
+    display: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+@keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+@media (max-width: 767px) {
+    /* When .sheet-open is added by JS, panel becomes a bottom sheet */
+    #habit-detail-panel.sheet-open {
+        display: flex !important;
+        flex-direction: column;
+        position: fixed;
+        bottom: 60px; /* sit above bottom nav */
+        left: 0;
+        right: 0;
+        max-height: 80vh;
+        border-radius: 20px 20px 0 0;
+        border-top: 1px solid var(--border);
+        background: var(--bg-primary);
+        z-index: 8000;
+        overflow-y: auto;
+        padding: 0 20px 28px;
+        animation: slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+    }
+
+    #habit-detail-panel.sheet-open .habit-sheet-handle {
+        display: block;
+    }
+
+    #habit-detail-panel.sheet-open .habit-sheet-close-btn {
+        display: flex;
+    }
 }
 
 /* ============================================
