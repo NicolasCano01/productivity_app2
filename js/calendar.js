@@ -4,7 +4,7 @@
 
 let currentCalendarDate = null;
 let selectedDate = null;
-let calendarViewMode = 'upcoming'; // 'upcoming' | 'month'
+let calendarViewMode = localStorage.getItem('calendarViewMode') || 'upcoming'; // 'upcoming' | 'month'
 
 // Initialize calendar when panel is shown
 function initCalendar() {
@@ -125,8 +125,7 @@ function buildUpcomingView(today, todayStr) {
     // Task list — grouped by date section, all upcoming tasks
     const taskListHtml = buildUpcomingTaskList(today, todayStr);
 
-    const pinnedHtml = buildPinnedTasksSection();
-    return stripHtml + aiInsightsHtml + taskListHtml + pinnedHtml;
+    return stripHtml + aiInsightsHtml + taskListHtml;
 }
 
 // ============================================
@@ -549,6 +548,7 @@ function buildMonthView(today, todayStr) {
 
 function toggleCalendarViewMode() {
     calendarViewMode = calendarViewMode === 'upcoming' ? 'month' : 'upcoming';
+    localStorage.setItem('calendarViewMode', calendarViewMode);
     renderCalendar();
 }
 

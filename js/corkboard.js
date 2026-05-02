@@ -5,6 +5,7 @@
 const NOTES_STORAGE_KEY = 'productivityHub_notes';
 let editingNoteId = null;
 let selectedNoteColor = '#FEF08A'; // default yellow
+let boardSearchQuery = ''; // real-time search filter
 
 // ============================================
 // STORAGE HELPERS
@@ -112,6 +113,11 @@ async function deleteNoteFromSupabase(noteId) {
 // RENDER
 // ============================================
 function renderBoard() {
+    // Reset search query and clear the input when opening the panel
+    boardSearchQuery = '';
+    const searchInput = document.getElementById('board-search');
+    if (searchInput) searchInput.value = '';
+
     // Sync from Supabase each time the board panel opens.
     // syncNotesFromSupabase() re-renders after the fetch completes,
     // so renderBoardNotes() below shows cached data instantly first.
@@ -124,9 +130,11 @@ function renderBoardNotes() {
     const grid = document.getElementById('board-notes-grid');
     if (!grid) return;
 
-    const notes = loadNotes();
+    const allNotes = loadNotes();
+    const q = boardSearchQuery.toLowerCase();
+    const notes = q ? allNotes.filter(n => n.content.toLowerCase().includes(q)) : allNotes;
 
-    if (notes.length === 0) {
+    if (allNotes.length === 0) {
         grid.innerHTML = `
             <div class="col-span-full text-center py-8" style="color:var(--text-secondary)">
                 <i class="fas fa-thumbtack text-3xl mb-3" style="opacity:0.3"></i>
@@ -134,6 +142,13 @@ function renderBoardNotes() {
                 <p style="font-size:12px;margin-top:4px;opacity:0.7">Tap + to add your first sticky note</p>
             </div>
         `;
+        return;
+    }
+
+    if (notes.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-6" style="color:var(--text-secondary)">
+            <i class="fas fa-search text-2xl mb-2" style="opacity:0.3"></i>
+            <p style="font-size:13px">No notes match your search</p></div>`;
         return;
     }
 
@@ -165,11 +180,13 @@ function renderBoardPinned() {
     const section = document.getElementById('board-pinned-section');
     if (!section) return;
 
-    const pinned = (appState.tasks || []).filter(t =>
+    const q = boardSearchQuery.toLowerCase();
+    const allPinned = (appState.tasks || []).filter(t =>
         t.is_pinned && t.status !== 'deleted' && !t.is_completed
     );
+    const pinned = q ? allPinned.filter(t => t.title.toLowerCase().includes(q)) : allPinned;
 
-    if (pinned.length === 0) {
+    if (allPinned.length === 0) {
         section.innerHTML = '';
         return;
     }
@@ -216,13 +233,19 @@ function renderBoardPinned() {
         </div>`;
     }).join('');
 
+    const gridContent = pinned.length === 0
+        ? `<div class="text-center py-4" style="color:var(--text-secondary);font-size:13px;grid-column:1/-1">
+               No pinned tasks match your search
+           </div>`
+        : cards;
+
     section.innerHTML = `
         <div class="flex items-center gap-2 mb-3 mt-5" style="padding:0 2px">
             <i class="fas fa-thumbtack" style="font-size:11px;color:var(--accent)"></i>
             <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--text-secondary);text-transform:uppercase">Pinned Tasks</span>
             <span style="font-size:11px;color:var(--text-secondary);opacity:0.6">(${pinned.length})</span>
         </div>
-        <div class="pinned-tasks-grid">${cards}</div>
+        <div class="pinned-tasks-grid">${gridContent}</div>
     `;
 }
 
@@ -326,4 +349,13 @@ function deleteNoteById(noteId) {
     deleteNoteFromSupabase(noteId);
     renderBoardNotes();
     showToast('Note deleted', 'success');
+}
+
+// ============================================
+// SEARCH
+// ============================================
+function filterBoardSearch(query) {
+    boardSearchQuery = (query || '').trim().toLowerCase();
+    renderBoardNotes();
+    renderBoardPinned();
 }
