@@ -551,16 +551,26 @@ body.dark .bottom-nav {
 
 /* ---- Adaptive textarea sizing ---- */
 .adaptive-textarea {
-    min-height: 100px;
+    min-height: 140px;
     resize: vertical;
 }
+/* Sticky note: longer content — give it more default space */
+#note-content.adaptive-textarea {
+    min-height: 180px;
+}
+/* Task notes: medium content */
+#task-notes.adaptive-textarea {
+    min-height: 140px;
+}
+/* Goal description: short-form */
+#goal-description.adaptive-textarea {
+    min-height: 80px;
+}
 @media (min-width: 768px) {
-    .adaptive-textarea {
-        min-height: 160px;
-    }
-    #goal-description.adaptive-textarea {
-        min-height: 80px;
-    }
+    .adaptive-textarea         { min-height: 200px; }
+    #note-content.adaptive-textarea  { min-height: 260px; }
+    #task-notes.adaptive-textarea    { min-height: 220px; }
+    #goal-description.adaptive-textarea { min-height: 110px; }
 }
 
 /* ---- Truncate notes to 2 lines ---- */
@@ -741,17 +751,11 @@ body.dark #login-modal input {
     color: var(--text-primary) !important;
 }
 
-/* ---- Pinned Tasks Grid ---- */
+/* ---- Pinned Tasks Grid — always 2 columns on mobile, 3 on desktop ---- */
 .pinned-tasks-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-}
-
-@media (max-width: 479px) {
-    .pinned-tasks-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .pinned-task-card {
@@ -847,10 +851,10 @@ body.dark #login-modal input {
     position: fixed;
     bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     right: 16px;
-    height: 44px;
-    padding: 0 16px;
-    border-radius: 22px;
-    background: var(--accent);
+    height: 50px;
+    padding: 0 20px;
+    border-radius: 25px;
+    background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
     color: white;
     border: none;
     cursor: pointer;
@@ -858,22 +862,32 @@ body.dark #login-modal input {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 14px;
     font-weight: 700;
     font-family: var(--font-system);
-    letter-spacing: 0.3px;
-    box-shadow: 0 4px 20px rgba(0,122,255,0.45);
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 18px rgba(88,86,214,0.50), 0 2px 8px rgba(0,122,255,0.25);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.ai-chat-fab::before {
+    /* Subtle inner highlight for depth */
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%);
+    pointer-events: none;
+}
+
 .ai-chat-fab:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 28px rgba(0,122,255,0.55);
+    transform: scale(1.06) translateY(-1px);
+    box-shadow: 0 8px 28px rgba(88,86,214,0.55), 0 3px 12px rgba(0,122,255,0.30);
 }
 
 .ai-chat-fab:active {
-    transform: scale(0.95);
+    transform: scale(0.96);
 }
 
 .ai-chat-fab.hidden {
@@ -1119,7 +1133,7 @@ body.dark #login-modal input {
 
 .board-notes-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 8px;
 }
