@@ -237,9 +237,18 @@ function openGoalModal(goalId) {
         if (taskInfo) taskInfo.innerHTML = '';
     }
     
-   // Populate category dropdown
+    // Populate category dropdown — must come BEFORE restoring the selected value
+    // because populateGoalCategories() clears the <select> innerHTML.
     populateGoalCategories();
-    
+
+    // Re-apply category selection after dropdown is rebuilt
+    if (goalId) {
+        const goal = appState.goals.find(g => g.id === goalId);
+        if (goal) {
+            document.getElementById('goal-category').value = goal.category_id || '';
+        }
+    }
+
     modal.classList.remove('hidden');
 }
 
@@ -370,6 +379,13 @@ async function deleteGoal() {
 
     const goalToDelete = appState.goals.find(g => g.id === editingGoalId);
     if (!goalToDelete) return;
+
+    // Confirmation dialog
+    const taskCntPreview = appState.tasks.filter(t => t.goal_id === editingGoalId && t.status !== 'deleted').length;
+    const warningText = taskCntPreview > 0
+        ? `This will also unlink ${taskCntPreview} task${taskCntPreview > 1 ? 's' : ''} from this goal.`
+        : 'This action cannot be undone immediately (you have a few seconds to undo).';
+    if (!confirm(`Delete "${goalToDelete.name}"?\n\n${warningText}`)) return;
 
     const taskCounts = getGoalTaskCounts(editingGoalId);
 
