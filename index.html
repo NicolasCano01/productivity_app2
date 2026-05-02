@@ -54,17 +54,21 @@
                 <h1 class="text-xl font-bold text-gray-800">Productivity Hub</h1>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="toggleDarkMode()" class="text-gray-600 hover:text-primary transition" title="Toggle dark mode">
+                <button onclick="toggleDarkMode()" class="header-action-btn text-gray-600 hover:text-primary transition" title="Toggle dark mode">
                     <i class="fas fa-moon text-xl" id="dark-mode-icon"></i>
+                    <span class="header-btn-label">Theme</span>
                 </button>
-                <button onclick="signOut()" class="text-gray-400 hover:text-danger transition" title="Sign out">
+                <button onclick="signOut()" class="header-action-btn text-gray-400 hover:text-danger transition" title="Sign out">
                     <i class="fas fa-sign-out-alt text-lg"></i>
+                    <span class="header-btn-label">Sign out</span>
                 </button>
-                <button onclick="openCategoryModal()" class="text-gray-600 hover:text-primary transition" title="Manage Categories">
+                <button onclick="openCategoryModal()" class="header-action-btn text-gray-600 hover:text-primary transition" title="Manage Categories">
                     <i class="fas fa-folder text-xl"></i>
+                    <span class="header-btn-label">Categories</span>
                 </button>
-                <button onclick="openBackupModal()" class="text-gray-600 hover:text-primary transition" title="Backup & Settings">
+                <button onclick="openBackupModal()" class="header-action-btn text-gray-600 hover:text-primary transition" title="Backup & Settings">
                     <i class="fas fa-cloud-upload-alt text-xl"></i>
+                    <span class="header-btn-label">Backup</span>
                 </button>
                 <div id="connection-status" class="flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-gray-300" id="status-dot"></div>

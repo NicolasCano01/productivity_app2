@@ -160,20 +160,22 @@ function renderHabits() {
                 class="habit-card${isSelected ? ' selected' : ''}"
                 draggable="true"
                 data-habit-id="${habit.id}"
+                onclick="selectHabit('${habit.id}')"
                 ondragstart="handleDragStart(event, '${habit.id}')"
                 ondragend="handleDragEnd(event)"
                 ondragover="handleDragOver(event)"
                 ondrop="handleDrop(event, '${habit.id}')"
                 ondragleave="handleDragLeave(event)"
+                style="cursor:pointer"
             >
                 <div class="flex items-center gap-3">
-                    <i class="fas fa-grip-vertical text-gray-400 text-sm cursor-move"></i>
+                    <i class="fas fa-grip-vertical text-gray-400 text-sm cursor-move" onclick="event.stopPropagation()"></i>
                     ${emoji ? `<div class="text-2xl">${emoji}</div>` : ''}
                     <div
                         class="habit-checkbox ${isCompleted ? 'checked' : ''}"
-                        onclick="toggleHabitCompletion('${habit.id}', '${habitLogDate}')"
+                        onclick="event.stopPropagation();toggleHabitCompletion('${habit.id}', '${habitLogDate}')"
                     ></div>
-                    <div class="flex-1 min-w-0" onclick="selectHabit('${habit.id}')">
+                    <div class="flex-1 min-w-0">
                         <h3 class="font-semibold text-sm truncate" style="color:${isCompleted ? 'var(--success)' : 'var(--text-primary)'};opacity:${isCompleted ? '0.75' : '1'};transition:color 0.2s,opacity 0.2s">
                             ${habit.name}
                         </h3>

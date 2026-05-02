@@ -695,6 +695,32 @@ body.dark header { background-color: var(--bg-secondary) !important; border-colo
 body.dark header h1 { color: var(--text-primary) !important; }
 body.dark header .text-gray-600 { color: var(--text-secondary) !important; }
 
+/* ---- Header action buttons with optional labels ---- */
+.header-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s;
+}
+.header-action-btn:hover { background: var(--bg-secondary); }
+.header-btn-label {
+    display: none;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+@media (min-width: 1024px) {
+    .header-btn-label { display: block; }
+}
+
 /* Modal inner panels */
 body.dark .modal-content { background-color: var(--bg-secondary); }
 body.dark label { color: var(--text-secondary) !important; }
@@ -720,6 +746,12 @@ body.dark #login-modal input {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+}
+
+@media (max-width: 479px) {
+    .pinned-tasks-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .pinned-task-card {
