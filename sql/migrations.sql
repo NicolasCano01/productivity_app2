@@ -110,3 +110,11 @@ ALTER TABLE _keepalive ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all on _keepalive"
     ON _keepalive FOR ALL USING (true) WITH CHECK (true);
+
+-- ─────────────────────────────────────────────────────────────
+-- 6. "In Progress" task status
+--    A lightweight flag so users can mark a task as started
+--    without completing it.  Is-in-progress tasks are shown in
+--    a dedicated "In Progress" section on the Board panel.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_in_progress boolean NOT NULL DEFAULT false;

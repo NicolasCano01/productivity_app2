@@ -335,6 +335,22 @@ body.dark .bottom-nav {
     border-left: 3px solid var(--danger, #FF3B30);
 }
 
+.task-card.in-progress {
+    border-left: 3px solid var(--warning, #FF9500);
+}
+
+.in-progress-badge {
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: rgba(255,149,0,0.12);
+    color: var(--warning, #FF9500);
+    white-space: nowrap;
+}
+
 .task-checkbox {
     width: 22px;
     height: 22px;
@@ -810,6 +826,11 @@ body.dark #login-modal input {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent);
     transform: scale(1.02);
+}
+
+/* In-progress cards on Board have an orange left accent */
+.pinned-task-card.in-progress-card {
+    border-left: 3px solid var(--warning, #FF9500);
 }
 
 /* ---- Pinned card checkbox ---- */

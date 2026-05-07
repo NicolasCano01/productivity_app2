@@ -6,36 +6,211 @@
 let selectedHabitId = null;
 const habitInsightCache = {};
 
-// Get habit streak count (backwards-compat helper)
-function getHabitStreak(habitId) {
-    const streak = appState.habitStreaks.find(s => s.habit_id === habitId);
-    return streak ? streak.current_streak : 0;
+// ============================================
+// STREAK COMPUTATION (habit-rule aware)
+// Replaces the naive consecutive-day logic with rules that
+// correctly handle exempt_weekends and weekly-frequency habits.
+// ============================================
+
+/**
+ * Current streak — respects habit rules:
+ *  - Daily, exempt_weekends=false : consecutive calendar days
+ *  - Daily, exempt_weekends=true  : consecutive WEEKDAYS (Sat/Sun are skipped)
+ *  - Weekly                       : consecutive weeks where target was met
+ */
+function computeCurrentStreakSmart(habitId) {
+    const habit = appState.habits.find(h => h.id === habitId);
+    if (!habit) return 0;
+
+    const completionSet = new Set(
+        appState.habitCompletions
+            .filter(c => c.habit_id === habitId)
+            .map(c => c.completion_date)
+    );
+    if (completionSet.size === 0) return 0;
+
+    const today = getMelbourneDate();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = getMelbourneDateString();
+
+    if (habit.frequency === 'weekly') {
+        return _weeklyStreak(completionSet, today, habit.weekly_target_days || 3);
+    }
+    return _dailyStreak(completionSet, today, todayStr, !!habit.exempt_weekends);
 }
 
-// Get full streak info object {current_streak, longest_streak}
-function getHabitStreakInfo(habitId) {
-    return appState.habitStreaks.find(s => s.habit_id === habitId) || { current_streak: 0, longest_streak: 0 };
+/** Daily streak walking backwards, skipping weekend days when exempt. */
+function _dailyStreak(completionSet, today, todayStr, exemptWeekends) {
+    const cursor = new Date(today);
+    let streak = 0;
+
+    // If today is not yet done, start from yesterday —
+    // don't break the streak just because the day isn't over yet.
+    if (!completionSet.has(todayStr)) {
+        cursor.setDate(cursor.getDate() - 1);
+    }
+
+    while (streak <= 3650) { // safety cap ~10 years
+        const dow = cursor.getDay(); // 0=Sun, 6=Sat
+        if (exemptWeekends && (dow === 0 || dow === 6)) {
+            // Weekend is exempt — skip over it, keep walking back
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+        }
+        const dStr = formatDateString(cursor);
+        if (completionSet.has(dStr)) {
+            streak++;
+            cursor.setDate(cursor.getDate() - 1);
+        } else {
+            break; // Required day was missed
+        }
+    }
+    return streak;
 }
 
-// Compute longest consecutive daily streak from local completion data
+/** Weekly streak: counts consecutive Mon–Sun weeks where N completions ≥ target. */
+function _weeklyStreak(completionSet, today, target) {
+    // Anchor to Monday of the current week
+    const dow = today.getDay();
+    const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+    const weekMonday = new Date(today);
+    weekMonday.setDate(today.getDate() - daysSinceMonday);
+    weekMonday.setHours(0, 0, 0, 0);
+
+    let streak = 0;
+    let cursor = new Date(weekMonday);
+    let isCurrentWeek = true;
+
+    while (streak <= 520) { // safety cap ~10 years
+        let count = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(cursor);
+            d.setDate(cursor.getDate() + i);
+            if (d > today) break; // Don't peek into the future
+            if (completionSet.has(formatDateString(d))) count++;
+        }
+
+        if (count >= target) {
+            streak++;
+        } else if (isCurrentWeek) {
+            // Current week still in progress — don't penalise it;
+            // just leave it out and let past weeks form the streak.
+        } else {
+            break; // Past week where target was missed
+        }
+
+        isCurrentWeek = false;
+        cursor.setDate(cursor.getDate() - 7);
+    }
+    return streak;
+}
+
+/**
+ * Longest streak (habit-aware).
+ * For daily habits: walk all completions finding longest run (respecting exemptions).
+ * For weekly habits: scan all weeks and find the longest consecutive sequence.
+ */
 function computeLongestStreak(habitId) {
+    const habit = appState.habits.find(h => h.id === habitId);
+    if (!habit) return _naiveLongestDailyStreak(habitId);
+
+    const completionSet = new Set(
+        appState.habitCompletions
+            .filter(c => c.habit_id === habitId)
+            .map(c => c.completion_date)
+    );
+    if (completionSet.size === 0) return 0;
+
+    if (habit.frequency === 'weekly') {
+        return _longestWeeklyStreak(completionSet, habit.weekly_target_days || 3);
+    }
+    return _longestDailyStreak(completionSet, !!habit.exempt_weekends);
+}
+
+function _longestDailyStreak(completionSet, exemptWeekends) {
+    if (completionSet.size === 0) return 0;
+    const sorted = [...completionSet].sort();
+    let best = 1, run = 1;
+    const dates = sorted.map(s => new Date(s + 'T00:00:00'));
+    for (let i = 1; i < dates.length; i++) {
+        // Walk between dates, counting required (non-exempt) days
+        const prev = dates[i - 1];
+        const curr = dates[i];
+        // Count non-exempt days between prev (exclusive) and curr (exclusive)
+        let gapHasMissed = false;
+        const walker = new Date(prev);
+        walker.setDate(walker.getDate() + 1);
+        while (walker < curr) {
+            const d = walker.getDay();
+            if (!(exemptWeekends && (d === 0 || d === 6))) {
+                gapHasMissed = true; // At least one required day was skipped
+                break;
+            }
+            walker.setDate(walker.getDate() + 1);
+        }
+        // curr itself counts if it's in the set (it is, since we're iterating sorted completions)
+        if (!gapHasMissed) { run++; best = Math.max(best, run); }
+        else { run = 1; }
+    }
+    return best;
+}
+
+function _longestWeeklyStreak(completionSet, target) {
+    if (completionSet.size === 0) return 0;
+    const sorted = [...completionSet].sort();
+    // Find the earliest Monday
+    const first = new Date(sorted[0] + 'T00:00:00');
+    const dow = first.getDay();
+    first.setDate(first.getDate() - (dow === 0 ? 6 : dow - 1));
+    const today = getMelbourneDate();
+    today.setHours(0, 0, 0, 0);
+
+    let best = 0, run = 0;
+    const cursor = new Date(first);
+    while (cursor <= today) {
+        let count = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(cursor);
+            d.setDate(cursor.getDate() + i);
+            if (completionSet.has(formatDateString(d))) count++;
+        }
+        if (count >= target) { run++; best = Math.max(best, run); }
+        else { run = 0; }
+        cursor.setDate(cursor.getDate() + 7);
+    }
+    return best;
+}
+
+function _naiveLongestDailyStreak(habitId) {
     const dates = appState.habitCompletions
         .filter(c => c.habit_id === habitId)
         .map(c => c.completion_date)
-        .sort(); // ascending YYYY-MM-DD strings
-
+        .sort();
     if (dates.length === 0) return 0;
-
     let best = 1, run = 1;
     for (let i = 1; i < dates.length; i++) {
-        if (dates[i] === dates[i - 1]) continue; // skip duplicate dates
-        const prev = new Date(dates[i - 1] + 'T00:00:00');
-        const curr = new Date(dates[i] + 'T00:00:00');
-        const diff = Math.round((curr - prev) / 86400000);
+        if (dates[i] === dates[i - 1]) continue;
+        const diff = Math.round(
+            (new Date(dates[i] + 'T00:00:00') - new Date(dates[i - 1] + 'T00:00:00')) / 86400000
+        );
         if (diff === 1) { run++; best = Math.max(best, run); }
         else { run = 1; }
     }
     return best;
+}
+
+// ---- Public API (override DB value with local smart computation) ----
+
+// Get habit streak count (backwards-compat helper)
+function getHabitStreak(habitId) {
+    return computeCurrentStreakSmart(habitId);
+}
+
+// Get full streak info object {current_streak, longest_streak}
+function getHabitStreakInfo(habitId) {
+    const current = computeCurrentStreakSmart(habitId);
+    const longest = Math.max(current, computeLongestStreak(habitId));
+    return { current_streak: current, longest_streak: longest };
 }
 
 // Check if habit is completed on a specific date (defaults to habitLogDate)

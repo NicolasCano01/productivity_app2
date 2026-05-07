@@ -4,6 +4,8 @@
 
 // Multi-category state for the task modal
 let selectedCategoryIds = new Set();
+// "In Progress" toggle state for the task modal
+let taskInProgressActive = false;
 
 // Switch task view (All/Overdue/Upcoming/Completed/Deleted)
 function switchTaskView(view) {
@@ -453,8 +455,9 @@ function renderTaskCard(task, dateGroup = null) {
     const pinColor = task.is_pinned ? 'var(--accent)' : 'var(--text-secondary)';
     const pinOpacity = task.is_pinned ? '1' : '0.35';
 
+    const showInProgressBadge = task.is_in_progress && !task.is_completed;
     return `
-        <div class="task-card ${task.is_completed ? 'completed' : ''}" ${dragHandlers}>
+        <div class="task-card ${task.is_completed ? 'completed' : ''} ${showInProgressBadge ? 'in-progress' : ''}" ${dragHandlers}>
             <div class="flex items-start gap-3">
                 ${dateGroup ? '<i class="fas fa-grip-vertical text-gray-400 text-sm cursor-move mt-1" style="opacity:0.35"></i>' : ''}
                 <div
@@ -468,6 +471,7 @@ function renderTaskCard(task, dateGroup = null) {
                         <h3 class="font-semibold flex-1 truncate" style="font-size:15px;color:${task.is_completed ? 'var(--text-secondary)' : 'var(--text-primary)'};${task.is_completed ? 'text-decoration:line-through' : ''}">
                             ${escapeHtml(task.title)}
                         </h3>
+                        ${showInProgressBadge ? `<span class="in-progress-badge"><i class="fas fa-spinner" style="font-size:8px"></i> WIP</span>` : ''}
                         ${severity ? `<span class="overdue-badge overdue-${severity}">OVERDUE</span>` : ''}
                     </div>
                     ${metaHtml}
@@ -523,11 +527,15 @@ async function toggleTaskCompletion(taskId) {
     
     const wasCompleted = task.is_completed;
     const previousCompletedAt = task.completed_at;
-    
+    const wasInProgress = task.is_in_progress;
+
     // Optimistic update
     task.is_completed = !task.is_completed;
     task.completed_at = task.is_completed ? new Date().toISOString() : null;
+    // Completing a task clears the in-progress flag
+    if (task.is_completed) task.is_in_progress = false;
     renderTasks();
+    if (typeof renderBoard === 'function' && currentPanel === 'board') renderBoard();
 
     // Invalidate AI insights cache so next calendar load shows fresh data
     if (typeof invalidateAIInsightsCache === 'function') invalidateAIInsightsCache();
@@ -555,17 +563,20 @@ async function toggleTaskCompletion(taskId) {
             // Undo function
             task.is_completed = wasCompleted;
             task.completed_at = previousCompletedAt;
+            task.is_in_progress = wasInProgress;
             renderTasks();
-            
+            if (typeof renderBoard === 'function' && currentPanel === 'board') renderBoard();
+
             try {
                 const { error } = await supabaseClient
                     .from('tasks')
                     .update({
                         is_completed: wasCompleted,
-                        completed_at: previousCompletedAt
+                        completed_at: previousCompletedAt,
+                        is_in_progress: wasInProgress
                     })
                     .eq('id', taskId);
-                
+
                 if (error) throw error;
             } catch (error) {
                 console.error('Error undoing task completion:', error);
@@ -575,22 +586,80 @@ async function toggleTaskCompletion(taskId) {
     }
     
     try {
+        const updatePayload = {
+            is_completed: task.is_completed,
+            completed_at: task.completed_at
+        };
+        if (task.is_completed) updatePayload.is_in_progress = false;
         const { error } = await supabaseClient
             .from('tasks')
-            .update({
-                is_completed: task.is_completed,
-                completed_at: task.completed_at
-            })
+            .update(updatePayload)
             .eq('id', taskId);
-        
+
         if (error) throw error;
-        
+
     } catch (error) {
         console.error('Error toggling task:', error);
         task.is_completed = !task.is_completed;
         task.completed_at = previousCompletedAt;
+        task.is_in_progress = wasInProgress;
         renderTasks();
         showToast('Failed to update task', 'error');
+    }
+}
+
+// ============================================
+// IN-PROGRESS HELPERS
+// ============================================
+
+/** Toggle the "In Progress" button appearance inside the modal */
+function toggleTaskInProgressModal() {
+    taskInProgressActive = !taskInProgressActive;
+    _applyInProgressToggleUI(taskInProgressActive);
+}
+
+function _applyInProgressToggleUI(active) {
+    const btn   = document.getElementById('task-inprogress-btn');
+    const icon  = document.getElementById('task-inprogress-icon');
+    const label = document.getElementById('task-inprogress-label');
+    if (!btn) return;
+    if (active) {
+        btn.style.borderColor  = 'var(--warning)';
+        btn.style.background   = 'rgba(255,149,0,0.10)';
+        icon.style.color       = 'var(--warning)';
+        label.style.color      = 'var(--warning)';
+        label.textContent      = 'In Progress ✓';
+    } else {
+        btn.style.borderColor  = 'var(--border)';
+        btn.style.background   = 'var(--bg-secondary)';
+        icon.style.color       = 'var(--text-secondary)';
+        label.style.color      = 'var(--text-secondary)';
+        label.textContent      = 'Mark as In Progress';
+    }
+}
+
+/** Toggle in-progress from a card (Board or task list) */
+async function toggleInProgressTask(taskId) {
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const newVal = !task.is_in_progress;
+    task.is_in_progress = newVal;
+
+    renderTasks();
+    if (typeof renderBoard === 'function' && currentPanel === 'board') renderBoard();
+
+    try {
+        const { error } = await supabaseClient
+            .from('tasks')
+            .update({ is_in_progress: newVal })
+            .eq('id', taskId);
+        if (error) throw error;
+        showToast(newVal ? 'Marked as In Progress' : 'Removed from In Progress', 'success');
+    } catch (e) {
+        task.is_in_progress = !newVal;
+        renderTasks();
+        showToast('Failed to update', 'error');
     }
 }
 
@@ -676,6 +745,8 @@ function openTaskModal(taskId = null) {
             document.getElementById('recurring-options').classList.add('hidden');
         }
 
+        // Restore in-progress toggle state
+        taskInProgressActive = task.is_in_progress || false;
         deleteBtn.classList.remove('hidden');
     } else {
         // Create new task
@@ -684,9 +755,11 @@ function openTaskModal(taskId = null) {
         document.getElementById('recurring-options').classList.add('hidden');
         deleteBtn.classList.add('hidden');
         selectedCategoryIds = new Set();
+        taskInProgressActive = false;
     }
 
     renderCategoryPicker();
+    _applyInProgressToggleUI(taskInProgressActive);
     modal.classList.remove('hidden');
 }
 
@@ -745,6 +818,7 @@ async function saveTask(event) {
                     category_id: categoryId,
                     goal_id: goalId,
                     due_date: dueDate,
+                    is_in_progress: taskInProgressActive,
                     ...recurrenceData
                 })
                 .eq('id', editingTaskId);
@@ -760,7 +834,7 @@ async function saveTask(event) {
 
             const taskIndex = appState.tasks.findIndex(t => t.id === editingTaskId);
             if (taskIndex !== -1 && updatedTask) {
-                appState.tasks[taskIndex] = updatedTask;
+                appState.tasks[taskIndex] = { ...updatedTask, is_in_progress: taskInProgressActive };
             }
 
             showToast('Task updated!', 'success');
@@ -776,6 +850,7 @@ async function saveTask(event) {
                     goal_id: goalId,
                     due_date: dueDate,
                     is_completed: false,
+                    is_in_progress: taskInProgressActive,
                     user_order: maxOrder + 1,
                     status: 'active',
                     ...recurrenceData
@@ -817,6 +892,7 @@ async function saveTask(event) {
         }
 
         renderTasks();
+        if (typeof renderBoard === 'function' && currentPanel === 'board') renderBoard();
         closeTaskModal();
         if (submitBtn) submitBtn.disabled = false;
     } catch (error) {

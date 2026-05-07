@@ -342,6 +342,7 @@
                         style="padding:8px 14px 8px 34px;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);outline:none;font-family:var(--font-system)">
                 </div>
                 <div id="board-notes-grid" class="board-notes-grid"></div>
+                <div id="board-in-progress-section"></div>
                 <div id="board-pinned-section"></div>
             </div>
 
@@ -724,6 +725,17 @@
                         </div>
                     </div>
                     
+                    <!-- In-Progress toggle -->
+                    <div class="mb-4">
+                        <button type="button" id="task-inprogress-btn"
+                            onclick="toggleTaskInProgressModal()"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition"
+                            style="border:1.5px solid var(--border);background:var(--bg-secondary);font-size:13px">
+                            <i id="task-inprogress-icon" class="fas fa-hourglass-half" style="color:var(--text-secondary)"></i>
+                            <span id="task-inprogress-label" style="color:var(--text-secondary)">Mark as In Progress</span>
+                        </button>
+                    </div>
+
                     <div class="flex gap-3">
                         <button type="button" onclick="closeTaskModal()" class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">Cancel</button>
                         <button type="submit" class="flex-1 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-blue-600 transition">Save</button>

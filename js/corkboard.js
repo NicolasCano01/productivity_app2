@@ -122,6 +122,7 @@ function renderBoard() {
     // syncNotesFromSupabase() re-renders after the fetch completes,
     // so renderBoardNotes() below shows cached data instantly first.
     renderBoardNotes();
+    renderBoardInProgress();
     renderBoardPinned();
     syncNotesFromSupabase();
 }
@@ -176,13 +177,87 @@ function renderNoteCard(note) {
     `;
 }
 
+function renderBoardInProgress() {
+    const section = document.getElementById('board-in-progress-section');
+    if (!section) return;
+
+    const q = boardSearchQuery.toLowerCase();
+    const allWip = (appState.tasks || []).filter(t =>
+        t.is_in_progress && t.status !== 'deleted' && !t.is_completed
+    );
+    const wip = q ? allWip.filter(t => t.title.toLowerCase().includes(q)) : allWip;
+
+    if (allWip.length === 0) {
+        section.innerHTML = '';
+        return;
+    }
+
+    const cards = wip.map(task => {
+        const cat = task.category;
+        const catColor = cat?.color_hex || '#6B7280';
+        const due = task.due_date ? formatDueDate(task.due_date) : null;
+        const isOverdue = task.due_date
+            ? new Date(task.due_date + 'T00:00:00') < new Date(getMelbourneDateString() + 'T00:00:00')
+            : false;
+
+        return `
+        <div class="pinned-task-card in-progress-card"
+            draggable="true"
+            ondragstart="handlePinnedDragStart(event, '${task.id}')"
+            ondragend="handlePinnedDragEnd(event)"
+            ondragover="handlePinnedDragOver(event)"
+            ondragleave="handlePinnedDragLeave(event)"
+            ondrop="handlePinnedDrop(event, '${task.id}')"
+            onclick="openTaskModal('${task.id}')">
+            <div class="pinned-task-card-top">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                    <button onclick="event.stopPropagation();toggleTaskCompletion('${task.id}')"
+                        class="pinned-task-checkbox"
+                        title="Mark complete">
+                    </button>
+                    <div style="width:7px;height:7px;border-radius:50%;background:${catColor};flex-shrink:0"></div>
+                    <span style="font-size:10px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat ? escapeHtml(cat.name) : 'No category'}</span>
+                </div>
+                <div class="flex items-center gap-0.5">
+                    <i class="fas fa-grip-vertical pinned-drag-handle"></i>
+                    <button onclick="event.stopPropagation();toggleInProgressTask('${task.id}')"
+                        style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:none;color:var(--warning,#FF9500);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px"
+                        title="Remove from In Progress">
+                        <i class="fas fa-hourglass-half"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="pinned-task-card-title">${escapeHtml(task.title)}</p>
+            ${due ? `<p style="font-size:10px;margin-top:auto;padding-top:6px;color:${isOverdue ? 'var(--danger)' : 'var(--text-secondary)'}">
+                <i class="fas fa-clock" style="margin-right:3px;opacity:0.7"></i>${due}
+            </p>` : ''}
+        </div>`;
+    }).join('');
+
+    const gridContent = wip.length === 0
+        ? `<div class="text-center py-4" style="color:var(--text-secondary);font-size:13px;grid-column:1/-1">
+               No in-progress tasks match your search
+           </div>`
+        : cards;
+
+    section.innerHTML = `
+        <div class="flex items-center gap-2 mb-3 mt-5" style="padding:0 2px">
+            <i class="fas fa-hourglass-half" style="font-size:11px;color:var(--warning,#FF9500)"></i>
+            <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--text-secondary);text-transform:uppercase">In Progress</span>
+            <span style="font-size:11px;color:var(--text-secondary);opacity:0.6">(${wip.length})</span>
+        </div>
+        <div class="pinned-tasks-grid">${gridContent}</div>
+    `;
+}
+
 function renderBoardPinned() {
     const section = document.getElementById('board-pinned-section');
     if (!section) return;
 
     const q = boardSearchQuery.toLowerCase();
+    // Exclude in-progress tasks — they appear in their own section above
     const allPinned = (appState.tasks || []).filter(t =>
-        t.is_pinned && t.status !== 'deleted' && !t.is_completed
+        t.is_pinned && !t.is_in_progress && t.status !== 'deleted' && !t.is_completed
     );
     const pinned = q ? allPinned.filter(t => t.title.toLowerCase().includes(q)) : allPinned;
 
@@ -357,5 +432,6 @@ function deleteNoteById(noteId) {
 function filterBoardSearch(query) {
     boardSearchQuery = (query || '').trim().toLowerCase();
     renderBoardNotes();
+    renderBoardInProgress();
     renderBoardPinned();
 }
