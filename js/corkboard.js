@@ -137,8 +137,8 @@ function renderBoardNotes() {
 
     if (allNotes.length === 0) {
         grid.innerHTML = `
-            <div class="col-span-full text-center py-8" style="color:var(--text-secondary)">
-                <i class="fas fa-thumbtack text-3xl mb-3" style="opacity:0.3"></i>
+            <div class="col-span-full text-center py-4" style="color:var(--text-secondary)">
+                <i class="fas fa-thumbtack text-2xl mb-2" style="opacity:0.3"></i>
                 <p style="font-size:14px">No notes yet</p>
                 <p style="font-size:12px;margin-top:4px;opacity:0.7">Tap + to add your first sticky note</p>
             </div>
