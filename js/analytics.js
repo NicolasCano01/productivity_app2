@@ -1398,6 +1398,35 @@ function createGoalStatusChart() {
 // PRODUCTIVITY INSIGHTS
 // ============================================
 
+// Render one "vs last week" comparison card, handling the zero-baseline case
+// (a % change is undefined when last week had no activity, so avoid a
+// misleading "+0% ↑" and show "New"/"—" instead).
+function _renderComparisonCard(label, m) {
+    let valueHtml, colorClass, icon;
+    if (m.lastWeek === 0 && m.thisWeek === 0) {
+        valueHtml = '—';
+        colorClass = 'text-gray-400';
+        icon = 'minus';
+    } else if (m.lastWeek === 0) {
+        valueHtml = 'New';
+        colorClass = 'text-success';
+        icon = 'arrow-up';
+    } else {
+        valueHtml = `${m.change >= 0 ? '+' : ''}${m.change}%`;
+        colorClass = m.change >= 0 ? 'text-success' : 'text-danger';
+        icon = m.change >= 0 ? 'arrow-up' : 'arrow-down';
+    }
+    return `
+        <div class="bg-white rounded-lg border border-gray-200 p-2">
+            <div class="text-xs text-gray-500">${label}</div>
+            <div class="text-lg font-bold ${colorClass}">${valueHtml}</div>
+            <div class="text-xs text-gray-400 flex items-center gap-1">
+                <i class="fas fa-${icon}"></i>
+                vs last week
+            </div>
+        </div>`;
+}
+
 function renderInsights() {
     const container = document.getElementById('insights-content');
     if (!container) return;
@@ -1413,36 +1442,9 @@ function renderInsights() {
     container.innerHTML = `
         <!-- Weekly Comparison Cards -->
         <div class="grid grid-cols-3 gap-2 mb-3">
-            <div class="bg-white rounded-lg border border-gray-200 p-2">
-                <div class="text-xs text-gray-500">Habits</div>
-                <div class="text-lg font-bold ${weeklyComparison.habits.change >= 0 ? 'text-success' : 'text-danger'}">
-                    ${weeklyComparison.habits.change >= 0 ? '+' : ''}${weeklyComparison.habits.change}%
-                </div>
-                <div class="text-xs text-gray-400 flex items-center gap-1">
-                    <i class="fas fa-${weeklyComparison.habits.change >= 0 ? 'arrow-up' : 'arrow-down'}"></i>
-                    vs last week
-                </div>
-            </div>
-            <div class="bg-white rounded-lg border border-gray-200 p-2">
-                <div class="text-xs text-gray-500">Tasks</div>
-                <div class="text-lg font-bold ${weeklyComparison.tasks.change >= 0 ? 'text-success' : 'text-danger'}">
-                    ${weeklyComparison.tasks.change >= 0 ? '+' : ''}${weeklyComparison.tasks.change}%
-                </div>
-                <div class="text-xs text-gray-400 flex items-center gap-1">
-                    <i class="fas fa-${weeklyComparison.tasks.change >= 0 ? 'arrow-up' : 'arrow-down'}"></i>
-                    vs last week
-                </div>
-            </div>
-            <div class="bg-white rounded-lg border border-gray-200 p-2">
-                <div class="text-xs text-gray-500">Goals</div>
-                <div class="text-lg font-bold ${weeklyComparison.goals.change >= 0 ? 'text-success' : 'text-danger'}">
-                    ${weeklyComparison.goals.change >= 0 ? '+' : ''}${weeklyComparison.goals.change}%
-                </div>
-                <div class="text-xs text-gray-400 flex items-center gap-1">
-                    <i class="fas fa-${weeklyComparison.goals.change >= 0 ? 'arrow-up' : 'arrow-down'}"></i>
-                    vs last week
-                </div>
-            </div>
+            ${_renderComparisonCard('Habits', weeklyComparison.habits)}
+            ${_renderComparisonCard('Tasks', weeklyComparison.tasks)}
+            ${_renderComparisonCard('Goals', weeklyComparison.goals)}
         </div>
         
         <!-- Best Day Analysis -->
