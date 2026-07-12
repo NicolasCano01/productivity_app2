@@ -647,7 +647,7 @@ body.dark .bottom-nav {
 /* ---- Dark mode text/bg overrides for Tailwind hardcoded classes ---- */
 body.dark .bg-white      { background-color: var(--bg-primary) !important; }
 body.dark .bg-gray-50    { background-color: var(--bg-secondary) !important; }
-body.dark .bg-gray-100   { background-color: var(--bg-secondary) !important; }
+body.dark .bg-gray-100   { background-color: var(--bg-tertiary) !important; }
 body.dark .bg-gray-200   { background-color: var(--bg-tertiary) !important; }
 body.dark .text-gray-900 { color: var(--text-primary) !important; }
 body.dark .text-gray-800 { color: var(--text-primary) !important; }
