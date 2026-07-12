@@ -679,6 +679,20 @@ function toggleRecurringOptions() {
     }
 }
 
+// Expand/collapse the "More options" disclosure (recurring + in-progress)
+function _setTaskMoreOptions(expanded) {
+    const section = document.getElementById('task-more-options');
+    const icon = document.getElementById('task-more-options-icon');
+    if (!section) return;
+    section.classList.toggle('hidden', !expanded);
+    if (icon) icon.style.transform = expanded ? 'rotate(180deg)' : '';
+}
+
+function toggleTaskMoreOptions() {
+    const section = document.getElementById('task-more-options');
+    _setTaskMoreOptions(section.classList.contains('hidden'));
+}
+
 function updateRecurringFields() {
     const recurrenceType = document.getElementById('task-recurrence-type').value;
     const intervalLabel = document.getElementById('interval-label');
@@ -748,6 +762,9 @@ function openTaskModal(taskId = null) {
         // Restore in-progress toggle state
         taskInProgressActive = task.is_in_progress || false;
         deleteBtn.classList.remove('hidden');
+
+        // Auto-expand "More options" if this task uses any of those settings
+        _setTaskMoreOptions(!!task.is_recurring || !!task.is_in_progress);
     } else {
         // Create new task
         modalTitle.textContent = 'Add Task';
@@ -756,6 +773,7 @@ function openTaskModal(taskId = null) {
         deleteBtn.classList.add('hidden');
         selectedCategoryIds = new Set();
         taskInProgressActive = false;
+        _setTaskMoreOptions(false);
     }
 
     renderCategoryPicker();

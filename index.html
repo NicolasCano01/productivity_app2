@@ -684,13 +684,23 @@
                         <input type="date" id="task-due-date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
                     </div>
                     
+                    <!-- More options disclosure (collapsed by default; keeps Save closer to the top) -->
+                    <button type="button" id="task-more-options-btn" onclick="toggleTaskMoreOptions()"
+                        class="w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-semibold transition mb-4"
+                        style="border:1.5px solid var(--border);background:var(--bg-secondary);font-size:13px;color:var(--text-secondary)">
+                        <span><i class="fas fa-sliders-h mr-2"></i>More options</span>
+                        <i id="task-more-options-icon" class="fas fa-chevron-down transition-transform"></i>
+                    </button>
+
+                    <div id="task-more-options" class="hidden">
+
                     <div class="mb-4">
                         <label class="flex items-center gap-3 cursor-pointer mb-2">
                             <input type="checkbox" id="task-is-recurring" class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary rounded" onchange="toggleRecurringOptions()">
                             <span class="text-sm font-semibold text-gray-700">Recurring task</span>
                         </label>
                     </div>
-                    
+
                     <div id="recurring-options" class="hidden mb-4 p-4 bg-gray-50 rounded-lg">
                         <div class="mb-3">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Repeat</label>
@@ -735,6 +745,9 @@
                             <span id="task-inprogress-label" style="color:var(--text-secondary)">Mark as In Progress</span>
                         </button>
                     </div>
+
+                    </div>
+                    <!-- /More options -->
 
                     <div class="flex gap-3">
                         <button type="button" onclick="closeTaskModal()" class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">Cancel</button>
