@@ -1028,15 +1028,20 @@ function renderCategoryPicker() {
 
     container.innerHTML = sorted.map(cat => {
         const isSelected = selectedCategoryIds.has(cat.id);
-        const bg = isSelected ? (cat.color_hex || 'var(--accent)') : 'var(--bg-primary)';
+        const color = cat.color_hex || 'var(--accent)';
+        const bg = isSelected ? color : 'var(--bg-primary)';
         const textColor = isSelected ? '#fff' : 'var(--text-primary)';
         const border = isSelected ? 'transparent' : 'var(--border)';
+        // Unselected chips show a colored dot so each category is visually distinct
+        const marker = isSelected
+            ? '<i class="fas fa-check" style="font-size:9px"></i>'
+            : `<span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>`;
         return `
             <button type="button" onclick="toggleCategorySelection('${cat.id}')"
                 style="background:${bg};color:${textColor};border:1.5px solid ${border};border-radius:20px;
                        padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;
                        transition:all 0.15s;display:inline-flex;align-items:center;gap:5px">
-                ${isSelected ? '<i class="fas fa-check" style="font-size:9px"></i>' : ''}
+                ${marker}
                 ${escapeHtml(cat.name)}
             </button>
         `;
