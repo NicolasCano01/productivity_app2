@@ -233,6 +233,7 @@ function gatherAIData() {
 
     // Habits data
     const dailyHabits = appState.habits.filter(h => h.frequency === 'daily');
+    const totalHabits = appState.habits.length; // all active (non-archived) habits
     const habitsCompletedToday = appState.habitCompletions.filter(c => c.completion_date === todayStr).length;
 
     // Habit completions this week
@@ -290,7 +291,8 @@ function gatherAIData() {
             totalActive: activeTasks.filter(t => !t.is_completed).length
         },
         habits: {
-            total: dailyHabits.length,
+            total: totalHabits,
+            dailyTotal: dailyHabits.length,
             completedToday: habitsCompletedToday,
             completionsThisWeek: habitCompletionsThisWeek,
             completionsLastWeek: habitCompletionsLastWeek,
@@ -351,10 +353,11 @@ Pending tasks sorted by urgency (overdue first, no-date last):
 Productivity summary:
 - Completed this week (Mon–${data.dayOfWeek}): ${data.tasks.completedThisWeek}, last week same slice (Mon–${data.dayOfWeek}): ${data.tasks.completedLastWeek}
 - Overdue: ${data.tasks.overdue.length}
-- Habits today: ${data.habits.completedToday}/${data.habits.total}
+- Habits: ${data.habits.total} active (${data.habits.dailyTotal} daily), ${data.habits.completedToday} completed today, ${data.habits.completionsThisWeek} completions this week
 - Goals: ${(data.goals || []).map(g => g.name + ' ' + g.progress + '%').join(', ') || 'none'}
 
-Keep each insight/suggestion under 25 words. Be specific — name the actual task the user should focus on.`;
+Keep each insight/suggestion under 25 words. Be specific — name the actual task the user should focus on.
+Only describe the data as given above — never claim a category is "absent", "empty", or "zero" unless the number shown is actually 0. Low activity is not the same as no activity.`;
 }
 
 function formatWeekDate(d) {
